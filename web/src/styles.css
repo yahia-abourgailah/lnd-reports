@@ -1,0 +1,165 @@
+/* Week 1 shell only. The design system arrives with the dashboard in week 5. */
+
+:root {
+  --ground: #f4f5f6;
+  --surface: #ffffff;
+  --ink: #14181a;
+  --ink-2: #4b5559;
+  --ink-3: #7a868b;
+  --rule: #dde1e3;
+  --accent: #14675c;
+  --ok: #2a6640;
+  --warn: #8e5e10;
+  --bad: #9e3722;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #0d1213;
+    --surface: #161d1e;
+    --ink: #e6edec;
+    --ink-2: #aebbb9;
+    --ink-3: #7b8a88;
+    --rule: #26302f;
+    --accent: #4fc0aa;
+    --ok: #6fbe87;
+    --warn: #d6a342;
+    --bad: #e17e66;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 48px 20px 80px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1 {
+  margin: 0 0 28px;
+  font-size: 30px;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 17px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+
+.card.error {
+  border-left: 3px solid var(--bad);
+}
+
+.muted {
+  color: var(--ink-3);
+  margin: 0 0 12px;
+}
+
+.warn {
+  color: var(--warn);
+  margin: 0 0 12px;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+
+.button {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--ground);
+  border: 0;
+  border-radius: 4px;
+  padding: 9px 16px;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button.secondary {
+  background: transparent;
+  color: var(--ink-2);
+  border: 1px solid var(--rule);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.facts {
+  margin: 0 0 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.facts div {
+  display: flex;
+  gap: 12px;
+}
+
+.facts dt {
+  width: 72px;
+  flex: none;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.components {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.components li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.components li span:nth-child(2) {
+  flex: 1;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}

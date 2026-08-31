@@ -1,0 +1,315 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_API: ghcr.io/${{ github.repository }}/api
+  IMAGE_WEB: ghcr.io/${{ github.repository }}/web
+
+permissions:
+  contents: read
+
+jobs:
+  # ------------------------------------------------------------------ secrets
+  # Runs first and on every push. A leaked credential in a commit is cheaper to
+  # catch here than to rotate later.
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------- api
+  api:
+    name: API — lint, types, tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lnd
+          POSTGRES_PASSWORD: lnd
+          POSTGRES_DB: lnd_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U lnd"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 3s --health-retries 5
+
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: api/pyproject.toml
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint
+        run: |
+          ruff check --output-format=github .
+          ruff format --check .
+
+      - name: Type-check
+        run: mypy src
+
+      - name: Tests
+        run: pytest
+
+      # The baseline creates roles and sets default privileges, which only a
+      # real Postgres will accept. Applying it here means a broken migration
+      # fails the build rather than the deploy.
+      - name: Migrations apply to an empty database
+        env:
+          DATABASE_URL: postgresql+psycopg://lnd:lnd@localhost:5432/lnd_test
+        run: alembic upgrade head
+
+      - name: Migrations are idempotent
+        env:
+          DATABASE_URL: postgresql+psycopg://lnd:lnd@localhost:5432/lnd_test
+        run: alembic upgrade head
+
+  # ---------------------------------------------------------------------- web
+  web:
+    name: Web — lint, types, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci || npm install
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+  # ------------------------------------------------------------------ compose
+  compose:
+    name: Compose files are valid
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render every environment
+        run: |
+          cp .env.example .env
+          for overlay in dev staging prod; do
+            echo "::group::compose.$overlay.yaml"
+            TLS_CERT_DIR=./certs docker compose \
+              -f compose.yaml -f compose.$overlay.yaml config > /dev/null
+            echo "::endgroup::"
+          done
+
+      - name: No host port is published except on proxy
+        run: |
+          cp .env.example .env
+          for overlay in staging prod; do
+            docker compose -f compose.yaml -f compose.$overlay.yaml config --format json \
+              | python3 -c '
+import json, sys
+services = json.load(sys.stdin)["services"]
+offenders = [n for n, s in services.items() if s.get("ports") and n != "proxy"]
+if offenders:
+    sys.exit(f"published a host port outside proxy: {offenders}")
+print("only proxy publishes a port")
+'
+          done
+
+  # --------------------------------------------------------------------- build
+  # Images are built once here and promoted unchanged. What staging tested is
+  # bit-identical to what production runs.
+  build:
+    name: Build and scan images
+    runs-on: ubuntu-latest
+    needs: [secrets, api, web, compose]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: api
+            dockerfile: docker/api.Dockerfile
+            image: api
+          - name: web
+            dockerfile: docker/web.Dockerfile
+            image: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      - name: Scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.image }}:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Push
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.image }}:${{ github.sha }}
+
+  # -------------------------------------------------------------------- smoke
+  # The image has to actually serve before it is allowed near staging.
+  smoke:
+    name: Smoke test the built stack
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bring the stack up
+        env:
+          REGISTRY: ${{ env.REGISTRY }}/${{ github.repository }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cp .env.example .env
+          sed -i "s|^REGISTRY=.*|REGISTRY=${REGISTRY}|" .env
+          sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|" .env
+          sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(python3 -c 'import secrets;print(secrets.token_urlsafe(48))')|" .env
+          docker compose -f compose.yaml -f compose.staging.yaml up -d db redis
+          docker compose -f compose.yaml -f compose.staging.yaml run --rm --no-deps \
+            -e DATABASE_URL=postgresql+psycopg://lnd:change-me-in-dev-only@db:5432/lnd \
+            api alembic upgrade head
+          docker compose -f compose.yaml -f compose.staging.yaml up -d
+
+      - name: Health, and raw immutability
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/v1/health || true)
+            [ "$code" = "200" ] && break
+            sleep 3
+          done
+          curl -fsS http://localhost:8080/v1/health | tee /dev/stderr | grep -q '"status":"ok"'
+          curl -fsS -o /dev/null -w 'auth/me → %{http_code}\n' -X GET \
+            http://localhost:8080/v1/auth/me | grep -q 401 || true
+
+          # The grant model from migration 0001, asserted against a live server:
+          # the application role may append to raw but never amend it.
+          docker compose -f compose.yaml -f compose.staging.yaml exec -T db \
+            psql -U lnd -d lnd -c "CREATE TABLE raw.probe(id int);" -c \
+            "SELECT has_table_privilege('lnd_app','raw.probe','INSERT') AS can_insert,
+                    has_table_privilege('lnd_app','raw.probe','UPDATE') AS can_update,
+                    has_table_privilege('lnd_app','raw.probe','DELETE') AS can_delete;" \
+            | tee /tmp/grants.txt
+          grep -qE 't *\| *f *\| *f' /tmp/grants.txt \
+            || (echo "raw is not append-only for lnd_app"; exit 1)
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f compose.yaml -f compose.staging.yaml logs --no-color
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f compose.yaml -f compose.staging.yaml down -v
+
+  # ------------------------------------------------------------------- deploy
+  deploy-staging:
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+    needs: smoke
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Migrations run as a one-shot container first. If they fail the deploy
+      # stops here and the running version is untouched.
+      - name: Promote ${{ github.sha }}
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd ${{ vars.STAGING_PATH }}
+            git fetch --all && git checkout ${{ github.sha }}
+            export IMAGE_TAG=${{ github.sha }}
+            docker compose -f compose.yaml -f compose.staging.yaml pull
+            docker compose -f compose.yaml -f compose.staging.yaml \
+              run --rm --no-deps api alembic upgrade head
+            docker compose -f compose.yaml -f compose.staging.yaml up -d
+            docker image prune -f
+
+      - name: Verify staging is healthy
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS "${{ vars.STAGING_URL }}/v1/health" | grep -q '"status":"ok"'; then
+              echo "staging healthy"; exit 0
+            fi
+            sleep 6
+          done
+          echo "staging did not become healthy"; exit 1

@@ -1,0 +1,155 @@
+# L&D Analytics Platform — base composition.
+#
+# Seven services. Nothing here publishes a host port and nothing here mounts
+# source: that is the job of the per-environment overlay. Run via the Makefile,
+# or explicitly:
+#
+#   docker compose -f compose.yaml -f compose.dev.yaml up
+#
+# api, worker and beat share one image with different commands, so a metric
+# computed in a background report runs identical code to the one on screen.
+
+name: lnd-analytics
+
+x-api-image: &api-image
+  image: ${REGISTRY:-lnd}/lnd-api:${IMAGE_TAG:-dev}
+  build:
+    context: .
+    dockerfile: docker/api.Dockerfile
+
+x-api-env: &api-env
+  ENVIRONMENT:              ${ENVIRONMENT:-dev}
+  LOG_LEVEL:                ${LOG_LEVEL:-INFO}
+  API_BASE_URL:             ${API_BASE_URL}
+  WEB_BASE_URL:             ${WEB_BASE_URL}
+  # Runtime connects as the least-privilege role, never as the owner.
+  DATABASE_URL:             postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${POSTGRES_DB}
+  REDIS_URL:                ${REDIS_URL:-redis://redis:6379/0}
+  SESSION_SECRET:           ${SESSION_SECRET}
+  SESSION_MAX_AGE_SECONDS:  ${SESSION_MAX_AGE_SECONDS:-28800}
+  OIDC_DISCOVERY_URL:       ${OIDC_DISCOVERY_URL:-}
+  OIDC_CLIENT_ID:           ${OIDC_CLIENT_ID:-}
+  OIDC_CLIENT_SECRET:       ${OIDC_CLIENT_SECRET:-}
+  OIDC_SCOPES:              ${OIDC_SCOPES:-openid profile email}
+  OIDC_REDIRECT_URI:        ${OIDC_REDIRECT_URI}
+  AUTH_DEV_BYPASS:          ${AUTH_DEV_BYPASS:-false}
+  AUTH_DEV_USER_EMAIL:      ${AUTH_DEV_USER_EMAIL:-}
+  AUTH_DEV_USER_NAME:       ${AUTH_DEV_USER_NAME:-}
+
+services:
+  # ------------------------------------------------------------------ proxy
+  # The only service that ever publishes a host port.
+  proxy:
+    image: nginx:1.27-alpine
+    depends_on:
+      api: { condition: service_healthy }
+      web: { condition: service_started }
+    restart: unless-stopped
+    networks: [edge]
+
+  # -------------------------------------------------------------------- web
+  web:
+    image: ${REGISTRY:-lnd}/lnd-web:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    restart: unless-stopped
+    networks: [edge]
+
+  # -------------------------------------------------------------------- api
+  # On `edge` so proxy can reach it, and on `backend` for db and redis.
+  # `edge` also carries its default route: the API needs egress to the IdP for
+  # OIDC discovery and JWKS.
+  api:
+    <<: *api-image
+    environment: *api-env
+    depends_on:
+      db:    { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [edge, backend]
+
+  # ----------------------------------------------------------------- worker
+  # Celery: sync, transform, exports, email. Never reachable from `edge`;
+  # `egress` gives it outbound access to the CRM, Graph, the HRIS and SMTP.
+  worker:
+    <<: *api-image
+    command: ["celery", "-A", "lnd.worker.celery_app:celery_app", "worker",
+              "--loglevel=INFO", "--concurrency=2"]
+    environment: *api-env
+    depends_on:
+      db:    { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "celery", "-A", "lnd.worker.celery_app:celery_app",
+             "inspect", "ping", "--destination", "celery@$${HOSTNAME}"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks: [backend, egress]
+
+  # ------------------------------------------------------------------- beat
+  # Schedules: 30-minute incremental, nightly full reconcile, monthly report.
+  # It only ever enqueues, so it needs redis and nothing else.
+  beat:
+    <<: *api-image
+    command: ["celery", "-A", "lnd.worker.celery_app:celery_app", "beat",
+              "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+    environment: *api-env
+    depends_on:
+      redis: { condition: service_healthy }
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+    networks: [backend]
+
+  # --------------------------------------------------------------------- db
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB:       ${POSTGRES_DB}
+      APP_DB_USER:       ${APP_DB_USER}
+      APP_DB_PASSWORD:   ${APP_DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    networks: [backend]
+
+  # ------------------------------------------------------------------ redis
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks: [backend]
+
+networks:
+  # Published ports and the route out to the IdP.
+  edge:
+  # internal: true means no default route — db and redis have no path to or
+  # from anything outside this project, whatever a future overlay does.
+  backend:
+    internal: true
+  # Outbound only, for the sync jobs.
+  egress:
+
+volumes:
+  db-data:
+  redis-data:

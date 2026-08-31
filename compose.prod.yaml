@@ -1,0 +1,75 @@
+# production overlay — VM, 4 vCPU / 8 GB / 100 GB.
+# Live, read-only source credentials.
+#
+# 443 is the only published port. Images are promoted by digest from staging;
+# nothing is ever built on this host. Credentials arrive as environment
+# variables from the company secret store at deploy time — none in this file.
+
+services:
+  proxy:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/proxy.tls.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${TLS_CERT_DIR:?TLS_CERT_DIR must point at fullchain.pem and privkey.pem}:/etc/nginx/certs:ro
+
+  web:
+    build: !reset null
+    pull_policy: always
+
+  api:
+    build: !reset null
+    pull_policy: always
+    command: ["gunicorn", "lnd.main:app",
+              "--worker-class", "uvicorn.workers.UvicornWorker",
+              "--workers", "4",
+              "--bind", "0.0.0.0:8000",
+              "--access-logfile", "-", "--error-logfile", "-",
+              "--timeout", "60", "--graceful-timeout", "30"]
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 2g }
+
+  worker:
+    build: !reset null
+    pull_policy: always
+    command: ["celery", "-A", "lnd.worker.celery_app:celery_app", "worker",
+              "--loglevel=INFO", "--concurrency=4"]
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 2g }
+
+  beat:
+    build: !reset null
+    pull_policy: always
+
+  db:
+    # Backups: nightly pg_dump -Fc plus WAL archiving, 30-day retention.
+    # The restore is rehearsed for real in week 10 — configured is not proven.
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/db:/docker-entrypoint-initdb.d:ro
+      - ${BACKUP_DIR:-./backups}:/backups
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=1GB"
+      - "-c"
+      - "effective_cache_size=3GB"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "wal_level=replica"
+      - "-c"
+      - "archive_mode=on"
+      - "-c"
+      - "archive_command=test ! -f /backups/wal/%f && cp %p /backups/wal/%f"
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 4g }
+
+  redis:
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 512m }

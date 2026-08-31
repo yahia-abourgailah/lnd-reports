@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- L&D Analytics Platform ---
+node_modules/
+web/dist/
+*.tsbuildinfo
+.ruff_cache/
+backups/
+certs/

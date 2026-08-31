@@ -1,0 +1,59 @@
+# dev overlay — local Docker Compose, anonymised fixtures, no real PII.
+#
+#   make up          →  http://localhost:8080
+#
+# Source is bind-mounted and the API runs under uvicorn --reload, so an edit is
+# live without a rebuild. The image itself is still the production one; only the
+# command and the mount differ.
+
+services:
+  proxy:
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docker/nginx/proxy.dev.conf:/etc/nginx/conf.d/default.conf:ro
+
+  web:
+    # Vite dev server rather than the nginx bundle, for hot module reload.
+    image: node:20-alpine
+    build: !reset null
+    working_dir: /app
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0 --port 8080"]
+    volumes:
+      - ./web:/app
+      - web-node-modules:/app/node_modules
+    environment:
+      VITE_API_BASE: /v1
+
+  api:
+    command: ["uvicorn", "lnd.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./api/src:/srv/src:ro
+      - ./api/alembic:/srv/alembic:ro
+    environment:
+      PYTHONPATH: /srv/src
+
+  worker:
+    volumes:
+      - ./api/src:/srv/src:ro
+    environment:
+      PYTHONPATH: /srv/src
+
+  beat:
+    volumes:
+      - ./api/src:/srv/src:ro
+    environment:
+      PYTHONPATH: /srv/src
+
+  db:
+    # Published locally so psql and a GUI client can attach. Never published in
+    # staging or production.
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+volumes:
+  web-node-modules:
