@@ -20,7 +20,7 @@ from sqlalchemy import Connection, select, text
 from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.orm import Session
 
-from lnd.models import SyncEntity, SyncMode, SyncRun, SyncSource, SyncStatus, SyncTrigger
+from lnd.models import Entity, Source, SyncMode, SyncRun, SyncStatus, SyncTrigger
 
 
 @pytest.fixture
@@ -36,8 +36,8 @@ def _run(**overrides: object) -> SyncRun:
     do — see `_finished_run` for why anything setting `finished_at` must not.
     """
     fields: dict[str, object] = {
-        "source": SyncSource.CRM,
-        "entity": SyncEntity.PROGRAM,
+        "source": Source.CRM,
+        "entity": Entity.PROGRAM,
         "mode": SyncMode.INCREMENTAL,
         "status": SyncStatus.RUNNING,
     }
@@ -88,16 +88,16 @@ class TestOneRunInFlight:
 
     def test_a_different_entity_may_run_concurrently(self, session: Session) -> None:
         """The grain is (source, entity), so CRM entities do not queue behind each other."""
-        session.add(_run(entity=SyncEntity.PROGRAM))
-        session.add(_run(entity=SyncEntity.SESSION))
-        session.add(_run(entity=SyncEntity.ATTENDANCE))
+        session.add(_run(entity=Entity.PROGRAM))
+        session.add(_run(entity=Entity.SESSION))
+        session.add(_run(entity=Entity.ATTENDANCE))
         session.flush()
 
     def test_the_same_entity_at_a_different_source_may_run_concurrently(
         self, session: Session
     ) -> None:
-        session.add(_run(source=SyncSource.CRM, entity=SyncEntity.FEEDBACK))
-        session.add(_run(source=SyncSource.FORMS, entity=SyncEntity.FEEDBACK))
+        session.add(_run(source=Source.CRM, entity=Entity.EMPLOYEE))
+        session.add(_run(source=Source.HRIS, entity=Entity.EMPLOYEE))
         session.flush()
 
     def test_a_finished_run_frees_the_entity(self, session: Session) -> None:
@@ -255,7 +255,7 @@ class TestDefaults:
 
     def test_enum_columns_round_trip_as_their_values(self, session: Session) -> None:
         """Stored as `crm`, not `CRM` — the string the API and the logs use."""
-        run = _run(source=SyncSource.HRIS, entity=SyncEntity.EMPLOYEE)
+        run = _run(source=Source.HRIS, entity=Entity.EMPLOYEE)
         session.add(run)
         session.flush()
 
@@ -271,7 +271,7 @@ class TestWatermarkReadback:
     """Decision one: the watermark is derived from the audit, not stored beside it."""
 
     def _latest_watermark(
-        self, session: Session, source: SyncSource, entity: SyncEntity
+        self, session: Session, source: Source, entity: Entity
     ) -> datetime | None:
         """The query /v1/freshness and the incremental sync both run."""
         return session.scalar(
@@ -308,7 +308,7 @@ class TestWatermarkReadback:
         )
         session.flush()
 
-        assert self._latest_watermark(session, SyncSource.CRM, SyncEntity.PROGRAM) == newer
+        assert self._latest_watermark(session, Source.CRM, Entity.PROGRAM) == newer
 
     def test_a_later_failure_does_not_move_the_position(self, session: Session) -> None:
         """The last-known-good rule, expressed as a WHERE clause.
@@ -333,7 +333,7 @@ class TestWatermarkReadback:
         )
         session.flush()
 
-        assert self._latest_watermark(session, SyncSource.CRM, SyncEntity.PROGRAM) == good
+        assert self._latest_watermark(session, Source.CRM, Entity.PROGRAM) == good
 
     def test_a_skipped_run_does_not_move_the_position(self, session: Session) -> None:
         """The breaker declining to call must not look like a successful pull."""
@@ -346,9 +346,9 @@ class TestWatermarkReadback:
         session.add(_run(status=SyncStatus.SKIPPED, started_at=now, finished_at=now))
         session.flush()
 
-        assert self._latest_watermark(session, SyncSource.CRM, SyncEntity.PROGRAM) == good
+        assert self._latest_watermark(session, Source.CRM, Entity.PROGRAM) == good
 
     def test_an_entity_never_synced_has_no_position(self, session: Session) -> None:
         """Which is how the first incremental knows to ask for everything."""
-        position = self._latest_watermark(session, SyncSource.LINKEDIN, SyncEntity.COURSE_ACTIVITY)
+        position = self._latest_watermark(session, Source.LINKEDIN, Entity.COURSE_COMPLETION)
         assert position is None

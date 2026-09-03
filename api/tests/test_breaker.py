@@ -12,13 +12,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from lnd import db
-from lnd.models import SyncEntity, SyncMode, SyncRun, SyncSource, SyncStatus
+from lnd.models import Entity, Source, SyncMode, SyncRun, SyncStatus
 from lnd.sync import SyncSkipped, record_sync_run
 from lnd.sync.breaker import BreakerState, BreakerStatus, breaker_status, check_breaker
 
-CRM = SyncSource.CRM
-HRIS = SyncSource.HRIS
-PROGRAM = SyncEntity.PROGRAM
+CRM = Source.CRM
+HRIS = Source.HRIS
+PROGRAM = Entity.PROGRAM
 
 NOW = datetime(2026, 9, 1, 12, 0, tzinfo=UTC)
 THRESHOLD = 3
@@ -29,8 +29,8 @@ def _run(
     status: SyncStatus,
     *,
     finished_ago: timedelta,
-    source: SyncSource = CRM,
-    entity: SyncEntity = PROGRAM,
+    source: Source = CRM,
+    entity: Entity = PROGRAM,
     error_type: str | None = None,
 ) -> int:
     with db.session_scope() as session:
@@ -48,12 +48,12 @@ def _run(
         return run.id
 
 
-def _status(source: SyncSource = CRM, *, now: datetime = NOW) -> BreakerStatus:
+def _status(source: Source = CRM, *, now: datetime = NOW) -> BreakerStatus:
     with db.session_scope() as session:
         return breaker_status(session, source, now=now, threshold=THRESHOLD, cooldown=COOLDOWN)
 
 
-def _fail_enough_to_trip(source: SyncSource = CRM, *, newest_ago: timedelta) -> None:
+def _fail_enough_to_trip(source: Source = CRM, *, newest_ago: timedelta) -> None:
     """Exactly `THRESHOLD` failures in a row, newest at `newest_ago`."""
     for index in range(THRESHOLD):
         _run(
@@ -114,9 +114,7 @@ class TestOpen:
         Five independent breakers would each need their own timeouts to learn
         the same fact.
         """
-        for index, entity in enumerate(
-            (SyncEntity.PROGRAM, SyncEntity.SESSION, SyncEntity.ATTENDANCE)
-        ):
+        for index, entity in enumerate((Entity.PROGRAM, Entity.SESSION, Entity.ATTENDANCE)):
             _run(
                 SyncStatus.FAILED,
                 entity=entity,
@@ -192,7 +190,7 @@ class TestSkipsAreNotFailures:
             session.add(
                 SyncRun(
                     source=CRM,
-                    entity=SyncEntity.SESSION,
+                    entity=Entity.SESSION,
                     mode=SyncMode.INCREMENTAL,
                     status=SyncStatus.RUNNING,
                     started_at=NOW,

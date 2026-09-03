@@ -21,6 +21,7 @@ from celery.schedules import crontab
 
 from lnd.config import get_settings
 from lnd.logging import configure_logging
+from lnd.models import SyncMode
 
 log = logging.getLogger(__name__)
 
@@ -78,10 +79,16 @@ def heartbeat() -> dict[str, str]:
 
 
 @celery_app.task(name="lnd.sync.incremental")
-def sync_incremental() -> dict[str, str]:
-    """The scheduled 30-minute pass (FR-A07)."""
-    log.info("incremental sync (not yet implemented)", extra={"event": "sync.incremental.stub"})
-    return {"status": "not_implemented"}
+def sync_incremental() -> dict[str, int]:
+    """The scheduled 30-minute pass (FR-A07).
+
+    Pulls what has changed since each entity's watermark and lands it in raw.
+    Every entity is attempted; one already in flight, or one that fails, is
+    logged and stepped over so a stuck entity never makes the others stale.
+    """
+    from lnd.sync.runner import configured_pullers, run_all, summarise
+
+    return summarise(run_all(configured_pullers(), mode=SyncMode.INCREMENTAL))
 
 
 @celery_app.task(name="lnd.sync.full_reconcile")

@@ -52,7 +52,7 @@ def land(
     source: Source,
     entity: Entity,
     records: Iterable[tuple[str, dict[str, Any]]],
-    sync_run_id: str | None = None,
+    sync_run_id: int | None = None,
 ) -> LandingResult:
     """Append records to `raw`, skipping any whose content is already stored.
 

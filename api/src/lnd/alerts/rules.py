@@ -31,10 +31,10 @@ from lnd.config import get_settings
 from lnd.models import (
     AlertKind,
     AlertSeverity,
-    SyncEntity,
+    Entity,
+    Source,
     SyncMode,
     SyncRun,
-    SyncSource,
     SyncStatus,
 )
 from lnd.sync.breaker import BreakerState, breaker_status
@@ -55,8 +55,8 @@ class Alert:
     severity: AlertSeverity
     title: str
     detail: str
-    source: SyncSource | None = None
-    entity: SyncEntity | None = None
+    source: Source | None = None
+    entity: Entity | None = None
     evidence: dict[str, Any] = field(default_factory=dict)
 
 
@@ -68,7 +68,7 @@ def _failing_sources(session: Session, now: datetime) -> list[Alert]:
     """
     alerts: list[Alert] = []
 
-    for source in SyncSource:
+    for source in Source:
         status = breaker_status(session, source, now=now)
         if status.state is BreakerState.CLOSED:
             continue
@@ -92,7 +92,7 @@ def _failing_sources(session: Session, now: datetime) -> list[Alert]:
 
 
 def _stale_or_missing_data(
-    session: Session, now: datetime, failing_sources: set[SyncSource]
+    session: Session, now: datetime, failing_sources: set[Source]
 ) -> list[Alert]:
     """Data that is behind, or that has never arrived.
 

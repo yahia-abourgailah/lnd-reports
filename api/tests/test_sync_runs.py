@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 
 from lnd import db
 from lnd.config import get_settings
-from lnd.models import SyncEntity, SyncMode, SyncRun, SyncSource, SyncStatus, SyncTrigger
+from lnd.models import Entity, Source, SyncMode, SyncRun, SyncStatus, SyncTrigger
 from lnd.sync import (
     SyncAlreadyRunning,
     SyncRunRecorder,
@@ -24,8 +24,8 @@ from lnd.sync import (
     watermark_for,
 )
 
-CRM = SyncSource.CRM
-PROGRAM = SyncEntity.PROGRAM
+CRM = Source.CRM
+PROGRAM = Entity.PROGRAM
 INCREMENTAL = SyncMode.INCREMENTAL
 
 
@@ -36,7 +36,7 @@ def _stored(run_id: int) -> SyncRun:
         return run
 
 
-def _insert_running(started_at: datetime, entity: SyncEntity = PROGRAM) -> int:
+def _insert_running(started_at: datetime, entity: Entity = PROGRAM) -> int:
     """A `running` row planted directly, standing in for a worker that died."""
     with db.session_scope() as session:
         run = SyncRun(
@@ -117,7 +117,7 @@ class TestSuccessfulRun:
 class TestWatermark:
     def test_the_first_run_of_an_entity_has_no_position(self, live_db: None) -> None:
         """Which is how it knows to ask the source for everything."""
-        with record_sync_run(CRM, SyncEntity.FEEDBACK, INCREMENTAL) as run:
+        with record_sync_run(CRM, Entity.EVALUATION, INCREMENTAL) as run:
             assert run.watermark_from is None
 
     def test_the_next_run_resumes_from_the_last_position_less_the_overlap(
@@ -262,7 +262,7 @@ class TestOverlapRefused:
     def test_a_different_entity_is_unaffected(self, live_db: None) -> None:
         with (
             record_sync_run(CRM, PROGRAM, INCREMENTAL),
-            record_sync_run(CRM, SyncEntity.SESSION, INCREMENTAL) as other,
+            record_sync_run(CRM, Entity.SESSION, INCREMENTAL) as other,
         ):
             assert other.run_id is not None
 
@@ -295,7 +295,7 @@ class TestReaper:
     def test_reaping_is_scoped_to_the_entity_asked_for(self, live_db: None) -> None:
         stale = datetime.now(UTC) - timedelta(hours=3)
         mine = _insert_running(stale, entity=PROGRAM)
-        theirs = _insert_running(stale, entity=SyncEntity.ATTENDANCE)
+        theirs = _insert_running(stale, entity=Entity.ATTENDANCE)
 
         with db.session_scope() as session:
             reaped = reap_abandoned_runs(
@@ -310,7 +310,7 @@ class TestReaper:
         """The unscoped form, for a periodic sweep."""
         stale = datetime.now(UTC) - timedelta(hours=3)
         _insert_running(stale, entity=PROGRAM)
-        _insert_running(stale, entity=SyncEntity.ATTENDANCE)
+        _insert_running(stale, entity=Entity.ATTENDANCE)
 
         with db.session_scope() as session:
             assert reap_abandoned_runs(session, older_than=timedelta(hours=1)) == 2

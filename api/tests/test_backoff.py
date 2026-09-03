@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from lnd.sync.backoff import RetryPolicy, retry
+from lnd.sync.backoff import RetryPolicy, honours_retryable_flag, retry
 
 
 class Transient(Exception):
@@ -140,3 +140,85 @@ class TestRetrying:
         assert policy.attempts == 3
         assert policy.base_delay == 1.0
         assert policy.max_delay == 30.0
+
+
+class Classified(Exception):
+    """One error class covering both transient and permanent faults, the shape
+    `CrmError` has."""
+
+    def __init__(self, message: str, *, retryable: bool) -> None:
+        super().__init__(message)
+        self.retryable = retryable
+
+
+class TestPredicate:
+    """Type alone is not always enough to decide."""
+
+    def test_a_self_declared_transient_failure_is_retried(self) -> None:
+        calls = {"n": 0}
+
+        def operation() -> str:
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise Classified("503", retryable=True)
+            return "ok"
+
+        result = retry(
+            operation,
+            retry_on=(Classified,),
+            retry_if=honours_retryable_flag,
+            policy=RetryPolicy(attempts=3, jitter=0),
+            sleep=lambda _: None,
+        )
+
+        assert result == "ok"
+        assert calls["n"] == 3
+
+    def test_a_self_declared_permanent_failure_is_not_retried(self) -> None:
+        """The case the predicate exists for.
+
+        `retry_on=(CrmError,)` alone would repeat a 401 three times — tripling
+        the failed logins, delaying the honest error by the whole backoff
+        budget, and risking a locked account.
+        """
+        calls = {"n": 0}
+        slept: list[float] = []
+
+        def refusing() -> str:
+            calls["n"] += 1
+            raise Classified("401", retryable=False)
+
+        with pytest.raises(Classified, match="401"):
+            retry(
+                refusing,
+                retry_on=(Classified,),
+                retry_if=honours_retryable_flag,
+                sleep=slept.append,
+            )
+
+        assert calls["n"] == 1
+        assert slept == []
+
+    def test_an_exception_without_the_flag_is_still_retried(self) -> None:
+        """Listing a type in `retry_on` is itself the claim that it is worth
+        repeating, so a plain exception is not silently downgraded."""
+        operation = Flaky(fail_times=1)
+
+        result = retry(
+            operation,
+            retry_on=(Transient,),
+            retry_if=honours_retryable_flag,
+            policy=RetryPolicy(attempts=2, jitter=0),
+            sleep=lambda _: None,
+        )
+
+        assert result == "ok"
+        assert operation.calls == 2
+
+    def test_it_works_against_the_real_crm_error(self) -> None:
+        """Wired to Person A's client rather than a look-alike, so a change to
+        how it classifies failures breaks here rather than in production."""
+        from lnd.sources.crm.client import CrmError
+
+        assert honours_retryable_flag(CrmError("500", retryable=True)) is True
+        assert honours_retryable_flag(CrmError("401", retryable=False)) is False

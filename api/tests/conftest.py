@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from lnd import db as lnd_db
 from lnd.config import get_settings
-from lnd.models import AlertNotification, SyncRun
+from lnd.models import AlertNotification, RawRecord, SyncRun
 
 # Captured at import, before the autouse fixture below replaces DATABASE_URL
 # with a deliberately unreachable one. Tests that need a real database read
@@ -134,7 +134,7 @@ def live_db(db_engine: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[None
     with lnd_db.session_scope() as session:
         marks = {
             model: session.scalar(select(func.coalesce(func.max(model.id), 0))) or 0
-            for model in (SyncRun, AlertNotification)
+            for model in (SyncRun, AlertNotification, RawRecord)
         }
 
     yield

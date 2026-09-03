@@ -152,7 +152,9 @@ def test_sources_and_entities_do_not_collide(db: Session) -> None:
 # --------------------------------------------------------------------- audit
 def test_the_sync_run_is_recorded_on_each_row(db: Session) -> None:
     """Week 2's audit trail: which sync produced which row."""
-    run_id = "3f1c8b9e-0f5a-4a0e-9a1e-2b7c6d5e4f30"
+    # ops.sync_run.id is a BigInteger, not the UUID this column first assumed
+    # (see migration 0005). The audit link is only useful if the two agree.
+    run_id = 4271
     _land(db, [("87", PROGRAM_87)], sync_run_id=run_id)
     assert db.query(RawRecord).one().sync_run_id == run_id
 

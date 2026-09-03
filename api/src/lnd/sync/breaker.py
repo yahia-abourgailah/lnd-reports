@@ -47,7 +47,7 @@ from sqlalchemy.orm import Session
 
 from lnd.config import get_settings
 from lnd.db import session_scope
-from lnd.models import SyncRun, SyncSource, SyncStatus
+from lnd.models import Source, SyncRun, SyncStatus
 from lnd.sync.runs import SyncSkipped
 
 log = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ class BreakerStatus:
     recomputing.
     """
 
-    source: SyncSource
+    source: Source
     state: BreakerState
     consecutive_failures: int
     last_failure_at: datetime | None = None
@@ -94,7 +94,7 @@ class BreakerStatus:
 
 def breaker_status(
     session: Session,
-    source: SyncSource,
+    source: Source,
     *,
     now: datetime | None = None,
     threshold: int | None = None,
@@ -151,7 +151,7 @@ def breaker_status(
     )
 
 
-def check_breaker(source: SyncSource, *, now: datetime | None = None) -> BreakerStatus:
+def check_breaker(source: Source, *, now: datetime | None = None) -> BreakerStatus:
     """Raise `SyncSkipped` if this source is not to be called right now.
 
     Called from inside a `record_sync_run` block, so the skip is recorded

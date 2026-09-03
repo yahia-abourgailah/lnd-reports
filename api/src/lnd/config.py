@@ -114,6 +114,13 @@ class Settings(BaseSettings):
     #: Each entry carries a program's whole roster and every answer on it, so a
     #: big page is a big response. 10-25 is the documented comfortable size.
     crm_per_page: int = 10
+    # The `filter[...]` key the CRM accepts for "changed since", if it accepts
+    # one at all. Empty means it does not, and the incremental sync degrades to
+    # fetching everything each pass — which is correct, just wasteful: nothing
+    # re-lands, because the unique constraint on (source, entity, source_id,
+    # payload_hash) makes an unchanged record a no-op. Set it and the same
+    # runner narrows the request, with no other change.
+    crm_changed_since_filter: str = ""
 
     #: Save every source response verbatim as a contract fixture. Off by
     #: default — an accidental recording against production would write real

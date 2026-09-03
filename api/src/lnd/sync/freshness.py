@@ -32,7 +32,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from lnd.config import get_settings
-from lnd.models import SyncEntity, SyncRun, SyncSource, SyncStatus
+from lnd.models import Entity, Source, SyncRun, SyncStatus
 from lnd.sync.catalogue import EXPECTED_ENTITIES, ordering_key
 
 FreshnessStatus = Literal["ok", "stale", "never_synced"]
@@ -50,8 +50,8 @@ def _worst(statuses: list[FreshnessStatus]) -> FreshnessStatus:
 
 
 class EntityFreshness(BaseModel):
-    source: SyncSource
-    entity: SyncEntity
+    source: Source
+    entity: Entity
     status: FreshnessStatus
 
     last_success_at: datetime | None = Field(
@@ -76,7 +76,7 @@ class EntityFreshness(BaseModel):
 
 
 class SourceFreshness(BaseModel):
-    source: SyncSource
+    source: Source
     status: FreshnessStatus
     lag_seconds: float | None = Field(
         default=None, description="The worst lag among this source's entities."
@@ -96,7 +96,7 @@ class FreshnessResponse(BaseModel):
 
 def _latest_per_pair(
     session: Session, *, successful_only: bool
-) -> dict[tuple[SyncSource, SyncEntity], SyncRun]:
+) -> dict[tuple[Source, Entity], SyncRun]:
     """One row per (source, entity): the newest run, by DISTINCT ON.
 
     Ordered by `finished_at` for successes and `started_at` for attempts — a
@@ -116,8 +116,8 @@ def _latest_per_pair(
 
 
 def _entity_freshness(
-    source: SyncSource,
-    entity: SyncEntity,
+    source: Source,
+    entity: Entity,
     last_success: SyncRun | None,
     last_attempt: SyncRun | None,
     now: datetime,
@@ -165,7 +165,7 @@ def platform_freshness(
     # syncing outside the catalogue is reported rather than silently dropped.
     pairs = sorted(set(EXPECTED_ENTITIES) | set(attempts) | set(successes), key=ordering_key)
 
-    by_source: dict[SyncSource, list[EntityFreshness]] = {}
+    by_source: dict[Source, list[EntityFreshness]] = {}
     for source, entity in pairs:
         by_source.setdefault(source, []).append(
             _entity_freshness(

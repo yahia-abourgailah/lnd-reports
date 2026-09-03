@@ -12,13 +12,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from lnd import db
-from lnd.models import SyncEntity, SyncMode, SyncRun, SyncSource, SyncStatus
+from lnd.models import Entity, Source, SyncMode, SyncRun, SyncStatus
 from lnd.sync.catalogue import EXPECTED_ENTITIES, ordering_key
 from lnd.sync.freshness import EntityFreshness, FreshnessResponse, platform_freshness
 
-CRM = SyncSource.CRM
-HRIS = SyncSource.HRIS
-PROGRAM = SyncEntity.PROGRAM
+CRM = Source.CRM
+HRIS = Source.HRIS
+PROGRAM = Entity.PROGRAM
 
 # A fixed clock, in the past, so nothing here depends on when the suite runs.
 NOW = datetime(2026, 9, 1, 12, 0, tzinfo=UTC)
@@ -27,8 +27,8 @@ HOUR = 3600
 
 def _add_run(
     *,
-    source: SyncSource = CRM,
-    entity: SyncEntity = PROGRAM,
+    source: Source = CRM,
+    entity: Entity = PROGRAM,
     status: SyncStatus = SyncStatus.SUCCESS,
     finished_ago: timedelta | None = None,
     watermark_to: datetime | None = None,
@@ -52,7 +52,7 @@ def _add_run(
         return run.id
 
 
-def _entity(report: FreshnessResponse, source: SyncSource, entity: SyncEntity) -> EntityFreshness:
+def _entity(report: FreshnessResponse, source: Source, entity: Entity) -> EntityFreshness:
     for reported_source in report.sources:
         for reported_entity in reported_source.entities:
             if reported_source.source is source and reported_entity.entity is entity:
@@ -82,20 +82,27 @@ class TestCatalogue:
         assert _report().status == "never_synced"
 
     def test_a_pair_outside_the_catalogue_is_still_reported(self, live_db: None) -> None:
-        """Feedback has no declared source while Q-03 is open. If it starts
-        syncing anyway it must appear, not be silently dropped."""
-        _add_run(entity=SyncEntity.FEEDBACK, finished_ago=timedelta(minutes=5))
+        """LinkedIn is a source in the enum but is not declared, because no
+        client exists and v1 scope is unconfirmed. If it starts syncing anyway
+        it must appear, not be silently dropped."""
+        _add_run(
+            source=Source.LINKEDIN,
+            entity=Entity.COURSE_COMPLETION,
+            finished_ago=timedelta(minutes=5),
+        )
 
-        assert _entity(_report(), CRM, SyncEntity.FEEDBACK).status == "ok"
+        reported = _entity(_report(), Source.LINKEDIN, Entity.COURSE_COMPLETION)
+        assert reported.status == "ok"
 
     def test_entities_are_ordered_by_the_pipeline_not_the_alphabet(self) -> None:
         ordered = sorted(EXPECTED_ENTITIES, key=ordering_key)
 
         assert [entity for source, entity in ordered if source is CRM] == [
-            SyncEntity.PROGRAM,
-            SyncEntity.SESSION,
-            SyncEntity.ENROLLMENT,
-            SyncEntity.ATTENDANCE,
+            Entity.PROGRAM,
+            Entity.SESSION,
+            Entity.ENROLLMENT,
+            Entity.ATTENDANCE,
+            Entity.EVALUATION,
         ]
 
 
@@ -172,10 +179,10 @@ class TestLastAttempt:
 
 class TestRollup:
     def test_a_source_takes_the_worst_status_among_its_entities(self, live_db: None) -> None:
-        for entity in (SyncEntity.PROGRAM, SyncEntity.SESSION, SyncEntity.ENROLLMENT):
+        for entity in (Entity.PROGRAM, Entity.SESSION, Entity.ENROLLMENT, Entity.EVALUATION):
             _add_run(entity=entity, finished_ago=timedelta(minutes=5))
-        _add_run(entity=SyncEntity.ATTENDANCE, finished_ago=timedelta(hours=4))
-        _add_run(source=HRIS, entity=SyncEntity.EMPLOYEE, finished_ago=timedelta(minutes=5))
+        _add_run(entity=Entity.ATTENDANCE, finished_ago=timedelta(hours=4))
+        _add_run(source=HRIS, entity=Entity.EMPLOYEE, finished_ago=timedelta(minutes=5))
 
         report = _report()
         crm = next(source for source in report.sources if source.source is CRM)
@@ -186,8 +193,8 @@ class TestRollup:
         assert report.status == "stale"
 
     def test_a_source_reports_the_worst_lag_among_its_entities(self, live_db: None) -> None:
-        _add_run(entity=SyncEntity.PROGRAM, finished_ago=timedelta(minutes=5))
-        _add_run(entity=SyncEntity.SESSION, finished_ago=timedelta(minutes=45))
+        _add_run(entity=Entity.PROGRAM, finished_ago=timedelta(minutes=5))
+        _add_run(entity=Entity.SESSION, finished_ago=timedelta(minutes=45))
 
         crm = next(source for source in _report().sources if source.source is CRM)
         assert crm.lag_seconds == pytest.approx(45 * 60, abs=1)
@@ -195,7 +202,7 @@ class TestRollup:
     def test_never_synced_outranks_stale(self, live_db: None) -> None:
         """No data at all is a bigger problem than old data, and the one an
         operator has to act on. Only programs synced; the rest never have."""
-        _add_run(entity=SyncEntity.PROGRAM, finished_ago=timedelta(hours=4))
+        _add_run(entity=Entity.PROGRAM, finished_ago=timedelta(hours=4))
 
         assert _report().status == "never_synced"
 

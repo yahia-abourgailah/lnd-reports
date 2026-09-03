@@ -13,10 +13,10 @@ from datetime import UTC, datetime, timedelta
 
 from lnd.db import SCHEMA_OPS
 from lnd.models import (
-    SyncEntity,
+    Entity,
+    Source,
     SyncMode,
     SyncRun,
-    SyncSource,
     SyncStatus,
     SyncTrigger,
 )
@@ -31,17 +31,19 @@ class TestEnumValues:
     """
 
     def test_sources(self) -> None:
-        assert [s.value for s in SyncSource] == ["crm", "forms", "hris", "linkedin"]
+        """Three, not four. Microsoft Forms was assumed to carry feedback until
+        the CRM turned out to return it nested inside each program (Q-03)."""
+        assert [s.value for s in Source] == ["crm", "hris", "linkedin"]
 
     def test_entities(self) -> None:
-        assert [e.value for e in SyncEntity] == [
+        assert [e.value for e in Entity] == [
             "program",
             "session",
             "enrollment",
             "attendance",
-            "feedback",
+            "evaluation",
             "employee",
-            "course_activity",
+            "course_completion",
         ]
 
     def test_modes(self) -> None:
@@ -55,7 +57,7 @@ class TestEnumValues:
 
     def test_str_enums_compare_as_their_value(self) -> None:
         """StrEnum, so a member is usable anywhere the wire string is."""
-        assert SyncSource.CRM == "crm"
+        assert Source.CRM == "crm"
         assert f"{SyncStatus.SUCCESS}" == "success"
 
 
@@ -143,8 +145,8 @@ class TestConstraints:
 class TestDerivedProperties:
     def test_duration_is_none_while_running(self) -> None:
         run = SyncRun(
-            source=SyncSource.CRM,
-            entity=SyncEntity.PROGRAM,
+            source=Source.CRM,
+            entity=Entity.PROGRAM,
             mode=SyncMode.INCREMENTAL,
             status=SyncStatus.RUNNING,
             started_at=datetime.now(UTC),
@@ -155,8 +157,8 @@ class TestDerivedProperties:
     def test_duration_is_wall_time_once_finished(self) -> None:
         started = datetime.now(UTC)
         run = SyncRun(
-            source=SyncSource.HRIS,
-            entity=SyncEntity.EMPLOYEE,
+            source=Source.HRIS,
+            entity=Entity.EMPLOYEE,
             mode=SyncMode.FULL_RECONCILE,
             status=SyncStatus.SUCCESS,
             started_at=started,
@@ -169,8 +171,8 @@ class TestDerivedProperties:
         """The breaker declining to call is a terminal outcome, not an in-flight one."""
         started = datetime.now(UTC)
         run = SyncRun(
-            source=SyncSource.LINKEDIN,
-            entity=SyncEntity.COURSE_ACTIVITY,
+            source=Source.LINKEDIN,
+            entity=Entity.COURSE_COMPLETION,
             mode=SyncMode.INCREMENTAL,
             status=SyncStatus.SKIPPED,
             started_at=started,
@@ -181,8 +183,8 @@ class TestDerivedProperties:
 
     def test_repr_identifies_the_run(self) -> None:
         run = SyncRun(
-            source=SyncSource.CRM,
-            entity=SyncEntity.ATTENDANCE,
+            source=Source.CRM,
+            entity=Entity.ATTENDANCE,
             mode=SyncMode.INCREMENTAL,
             status=SyncStatus.RUNNING,
         )

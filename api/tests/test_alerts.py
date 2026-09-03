@@ -19,16 +19,16 @@ from lnd.models import (
     AlertKind,
     AlertNotification,
     AlertSeverity,
-    SyncEntity,
+    Entity,
+    Source,
     SyncMode,
     SyncRun,
-    SyncSource,
     SyncStatus,
 )
 
-CRM = SyncSource.CRM
-HRIS = SyncSource.HRIS
-PROGRAM = SyncEntity.PROGRAM
+CRM = Source.CRM
+HRIS = Source.HRIS
+PROGRAM = Entity.PROGRAM
 
 NOW = datetime(2026, 9, 1, 12, 0, tzinfo=UTC)
 RENOTIFY = timedelta(hours=6)
@@ -38,8 +38,8 @@ def _run(
     status: SyncStatus,
     *,
     finished_at: datetime,
-    source: SyncSource = CRM,
-    entity: SyncEntity = PROGRAM,
+    source: Source = CRM,
+    entity: Entity = PROGRAM,
     mode: SyncMode = SyncMode.INCREMENTAL,
     deleted: int = 0,
     error_type: str | None = None,
@@ -66,7 +66,7 @@ def _ago(**kwargs: float) -> datetime:
 
 
 def _sync_everything_healthily(
-    except_for: tuple[SyncSource, SyncEntity] | None = None,
+    except_for: tuple[Source, Entity] | None = None,
 ) -> None:
     """A clean baseline, so a test can isolate the one thing it is about.
 
@@ -74,11 +74,12 @@ def _sync_everything_healthily(
     success — adding an old one on top of a recent one proves nothing.
     """
     for source, entity in (
-        (CRM, SyncEntity.PROGRAM),
-        (CRM, SyncEntity.SESSION),
-        (CRM, SyncEntity.ENROLLMENT),
-        (CRM, SyncEntity.ATTENDANCE),
-        (HRIS, SyncEntity.EMPLOYEE),
+        (CRM, Entity.PROGRAM),
+        (CRM, Entity.SESSION),
+        (CRM, Entity.ENROLLMENT),
+        (CRM, Entity.ATTENDANCE),
+        (CRM, Entity.EVALUATION),
+        (HRIS, Entity.EMPLOYEE),
     ):
         if except_for == (source, entity):
             continue
@@ -148,6 +149,7 @@ class TestRules:
             "never_synced:crm:session",
             "never_synced:crm:enrollment",
             "never_synced:crm:attendance",
+            "never_synced:crm:evaluation",
             "never_synced:hris:employee",
         }
 
@@ -157,16 +159,16 @@ class TestRules:
         assert all(alert.severity is AlertSeverity.WARNING for alert in _alerts())
 
     def test_an_entity_outside_the_catalogue_is_not_reported_missing(self, live_db: None) -> None:
-        """Feedback has no declared source while Q-03 is open. Alerting that it
-        has never synced would be a permanent false alarm."""
+        """LinkedIn is in the enum but undeclared — no client exists and v1
+        scope is unconfirmed. Alerting that it has never synced would be a
+        permanent false alarm against something nobody agreed to build."""
         _sync_everything_healthily()
 
-        assert "never_synced:crm:feedback" not in _keys()
-        assert "never_synced:forms:feedback" not in _keys()
+        assert "never_synced:linkedin:course_completion" not in _keys()
 
     def test_stale_data_is_reported(self, live_db: None) -> None:
-        _sync_everything_healthily(except_for=(CRM, SyncEntity.SESSION))
-        _run(SyncStatus.SUCCESS, entity=SyncEntity.SESSION, finished_at=_ago(hours=4))
+        _sync_everything_healthily(except_for=(CRM, Entity.SESSION))
+        _run(SyncStatus.SUCCESS, entity=Entity.SESSION, finished_at=_ago(hours=4))
 
         stale = [alert for alert in _alerts() if alert.kind is AlertKind.DATA_STALE]
         assert [alert.key for alert in stale] == ["data_stale:crm:session"]
@@ -187,8 +189,8 @@ class TestRules:
         The CRM being down is why its entities are going stale; reporting both
         makes the operator dig for the fact they needed first.
         """
-        _sync_everything_healthily(except_for=(CRM, SyncEntity.SESSION))
-        _run(SyncStatus.SUCCESS, entity=SyncEntity.SESSION, finished_at=_ago(hours=9))
+        _sync_everything_healthily(except_for=(CRM, Entity.SESSION))
+        _run(SyncStatus.SUCCESS, entity=Entity.SESSION, finished_at=_ago(hours=9))
         _fail_crm_until_the_breaker_trips()
 
         keys = _keys()
@@ -196,11 +198,11 @@ class TestRules:
         assert not any(key.startswith("data_stale:crm") for key in keys)
 
     def test_another_source_is_unaffected_by_the_suppression(self, live_db: None) -> None:
-        _sync_everything_healthily(except_for=(HRIS, SyncEntity.EMPLOYEE))
+        _sync_everything_healthily(except_for=(HRIS, Entity.EMPLOYEE))
         _run(
             SyncStatus.SUCCESS,
             source=HRIS,
-            entity=SyncEntity.EMPLOYEE,
+            entity=Entity.EMPLOYEE,
             finished_at=_ago(hours=4),
         )
         _fail_crm_until_the_breaker_trips()
@@ -213,7 +215,7 @@ class TestRules:
         run_id = _run(
             SyncStatus.SUCCESS,
             mode=SyncMode.FULL_RECONCILE,
-            entity=SyncEntity.ATTENDANCE,
+            entity=Entity.ATTENDANCE,
             finished_at=_ago(hours=2),
             deleted=140,
         )

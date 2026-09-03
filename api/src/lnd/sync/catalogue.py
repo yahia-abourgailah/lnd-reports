@@ -16,35 +16,40 @@ platform, changes with a code release, and belongs where it can be tested.
 
 from __future__ import annotations
 
-from lnd.models import SyncEntity, SyncSource
+from lnd.models import Entity, Source
 
 # Pairs whose source is settled.
 #
-# Not listed yet, and why:
-#   (?, FEEDBACK)            Q-03 has not settled whether evaluations come from
-#                            the CRM or from Microsoft Forms. Adding the wrong
-#                            one would report a permanent never_synced against
-#                            a source that was never meant to carry it.
-#   (LINKEDIN, COURSE_...)   Scope is unresolved — the delivery plan (BRD v1.0)
-#                            puts LinkedIn Learning out of v1 for want of a
-#                            feed; the repository README follows v1.1 and lists
-#                            it as a source.
+# Evaluations are here now that Q-03 is answered: the CRM's Learning Program
+# Dataset returns `survey`, `survey_answers[]` and `assessment_answers[]` nested
+# inside each program, so feedback comes from the CRM and Microsoft Forms is not
+# a source at all. That answer cost one tuple, because the grain was always
+# (source, entity) rather than a column per source.
 #
-# Both are still valid values on `sync_run`, so if either starts syncing it
+# Not listed yet:
+#   (LINKEDIN, COURSE_COMPLETION)  In the enum because the source exists, but
+#                                  no client does and v1 scope is unconfirmed —
+#                                  the delivery plan puts LinkedIn Learning out
+#                                  of v1 for want of a feed. Declaring it would
+#                                  raise a permanent never_synced alert against
+#                                  something nobody has agreed to build.
+#
+# It remains a valid value on `sync_run`, so if it ever starts syncing it
 # appears in freshness through the observed half of the union.
-EXPECTED_ENTITIES: tuple[tuple[SyncSource, SyncEntity], ...] = (
-    (SyncSource.CRM, SyncEntity.PROGRAM),
-    (SyncSource.CRM, SyncEntity.SESSION),
-    (SyncSource.CRM, SyncEntity.ENROLLMENT),
-    (SyncSource.CRM, SyncEntity.ATTENDANCE),
-    (SyncSource.HRIS, SyncEntity.EMPLOYEE),
+EXPECTED_ENTITIES: tuple[tuple[Source, Entity], ...] = (
+    (Source.CRM, Entity.PROGRAM),
+    (Source.CRM, Entity.SESSION),
+    (Source.CRM, Entity.ENROLLMENT),
+    (Source.CRM, Entity.ATTENDANCE),
+    (Source.CRM, Entity.EVALUATION),
+    (Source.HRIS, Entity.EMPLOYEE),
 )
 
-_SOURCE_ORDER = {member: index for index, member in enumerate(SyncSource)}
-_ENTITY_ORDER = {member: index for index, member in enumerate(SyncEntity)}
+_SOURCE_ORDER = {member: index for index, member in enumerate(Source)}
+_ENTITY_ORDER = {member: index for index, member in enumerate(Entity)}
 
 
-def ordering_key(pair: tuple[SyncSource, SyncEntity]) -> tuple[int, int]:
+def ordering_key(pair: tuple[Source, Entity]) -> tuple[int, int]:
     """Sort by declaration order, not alphabetically.
 
     The enums are declared in pipeline order — programs before sessions before

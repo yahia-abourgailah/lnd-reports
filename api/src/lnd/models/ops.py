@@ -28,11 +28,11 @@ more than a log line would:
     from a row and ends in the logs.
 
 The grain is `(source, entity)`, not `source`. The CRM alone yields programs,
-sessions, enrollments, attendance and feedback, each with its own `updated_at`
-and its own pace; one shared watermark would let a fast entity drag a slow one
-backwards or skip it entirely. Keeping the pair also leaves Q-03 open — whether
-feedback arrives from the CRM or from Microsoft Forms is configuration here, not
-a migration.
+sessions, enrollments, attendance and evaluations, each with its own
+`updated_at` and its own pace; one shared watermark would let a fast entity drag
+a slow one backwards or skip it entirely. Keeping the pair is also what made
+Q-03 costless to answer: evaluations turned out to come from the CRM rather than
+Microsoft Forms, and that was a change to one tuple, not to this schema.
 """
 
 from __future__ import annotations
@@ -60,31 +60,14 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from lnd.db import SCHEMA_OPS, Base
 
-
-class SyncSource(StrEnum):
-    """The four systems the platform reads. It writes to none of them."""
-
-    CRM = "crm"
-    FORMS = "forms"
-    HRIS = "hris"
-    LINKEDIN = "linkedin"
-
-
-class SyncEntity(StrEnum):
-    """What was pulled. Which source carries which entity is configuration.
-
-    `FEEDBACK` deliberately names no source: Q-03 has not settled whether
-    evaluations come from the CRM or from Microsoft Forms, and this table does
-    not need to know before that is answered.
-    """
-
-    PROGRAM = "program"
-    SESSION = "session"
-    ENROLLMENT = "enrollment"
-    ATTENDANCE = "attendance"
-    FEEDBACK = "feedback"
-    EMPLOYEE = "employee"
-    COURSE_ACTIVITY = "course_activity"
+# `Source` and `Entity` are defined once, next to the raw table that stores
+# them, and used unchanged here. They were briefly duplicated — this module
+# carried its own SyncSource/SyncEntity — and the two spellings disagreed:
+# `feedback` against `evaluation`, `course_activity` against
+# `course_completion`, and a `forms` source that turned out not to exist. Two
+# vocabularies for one set of facts is how a sync comes to report an entity
+# under a name the raw layer has never heard of, so there is now one.
+from lnd.ingest.models import Entity, Source
 
 
 class SyncMode(StrEnum):
@@ -214,12 +197,8 @@ class SyncRun(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
     # -- what ran -----------------------------------------------------------
-    source: Mapped[SyncSource] = mapped_column(
-        _enum_column(SyncSource, "sync_source"), nullable=False
-    )
-    entity: Mapped[SyncEntity] = mapped_column(
-        _enum_column(SyncEntity, "sync_entity"), nullable=False
-    )
+    source: Mapped[Source] = mapped_column(_enum_column(Source, "sync_source"), nullable=False)
+    entity: Mapped[Entity] = mapped_column(_enum_column(Entity, "sync_entity"), nullable=False)
     mode: Mapped[SyncMode] = mapped_column(_enum_column(SyncMode, "sync_mode"), nullable=False)
     triggered_by: Mapped[SyncTrigger] = mapped_column(
         _enum_column(SyncTrigger, "sync_trigger"),
@@ -359,11 +338,11 @@ class AlertNotification(Base):
 
     # Nullable: a failing *source* has no single entity, and a future rule may
     # have neither.
-    source: Mapped[SyncSource | None] = mapped_column(
-        _enum_column(SyncSource, "sync_source"), nullable=True
+    source: Mapped[Source | None] = mapped_column(
+        _enum_column(Source, "sync_source"), nullable=True
     )
-    entity: Mapped[SyncEntity | None] = mapped_column(
-        _enum_column(SyncEntity, "sync_entity"), nullable=True
+    entity: Mapped[Entity | None] = mapped_column(
+        _enum_column(Entity, "sync_entity"), nullable=True
     )
 
     first_seen_at: Mapped[datetime] = mapped_column(

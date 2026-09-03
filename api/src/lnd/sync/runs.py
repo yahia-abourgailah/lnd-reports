@@ -44,7 +44,7 @@ from sqlalchemy.orm import Session
 
 from lnd.config import get_settings
 from lnd.db import session_scope
-from lnd.models import SyncEntity, SyncMode, SyncRun, SyncSource, SyncStatus, SyncTrigger
+from lnd.models import Entity, Source, SyncMode, SyncRun, SyncStatus, SyncTrigger
 
 log = logging.getLogger(__name__)
 
@@ -86,8 +86,8 @@ class SyncRunRecorder:
     """
 
     run_id: int
-    source: SyncSource
-    entity: SyncEntity
+    source: Source
+    entity: Entity
     mode: SyncMode
     watermark_from: datetime | None
     records_fetched: int = 0
@@ -124,7 +124,7 @@ class SyncRunRecorder:
         self.details.update(fields)
 
 
-def last_successful_run(session: Session, source: SyncSource, entity: SyncEntity) -> SyncRun | None:
+def last_successful_run(session: Session, source: Source, entity: Entity) -> SyncRun | None:
     """The newest run that actually worked, or None if there has never been one.
 
     Backs both the watermark and `/v1/freshness`; `ix_sync_run_last_success` is
@@ -144,8 +144,8 @@ def last_successful_run(session: Session, source: SyncSource, entity: SyncEntity
 
 def watermark_for(
     session: Session,
-    source: SyncSource,
-    entity: SyncEntity,
+    source: Source,
+    entity: Entity,
     *,
     overlap: timedelta | None = None,
 ) -> datetime | None:
@@ -167,8 +167,8 @@ def reap_abandoned_runs(
     session: Session,
     *,
     older_than: timedelta,
-    source: SyncSource | None = None,
-    entity: SyncEntity | None = None,
+    source: Source | None = None,
+    entity: Entity | None = None,
 ) -> int:
     """Close out runs whose worker died, and return how many were closed.
 
@@ -240,8 +240,8 @@ def _truncate(value: str, limit: int) -> str:
 
 
 def _open_run(
-    source: SyncSource,
-    entity: SyncEntity,
+    source: Source,
+    entity: Entity,
     mode: SyncMode,
     triggered_by: SyncTrigger,
     attempts: int,
@@ -357,8 +357,8 @@ def _close_run(
 
 @contextmanager
 def record_sync_run(
-    source: SyncSource,
-    entity: SyncEntity,
+    source: Source,
+    entity: Entity,
     mode: SyncMode,
     *,
     triggered_by: SyncTrigger = SyncTrigger.SCHEDULED,
@@ -367,7 +367,7 @@ def record_sync_run(
 ) -> Iterator[SyncRunRecorder]:
     """Run a sync with its audit row opened, stamped and closed around it.
 
-        with record_sync_run(SyncSource.CRM, SyncEntity.PROGRAM,
+        with record_sync_run(Source.CRM, Entity.PROGRAM,
                              SyncMode.INCREMENTAL) as run:
             page = client.programs(changed_since=run.watermark_from)
             run.count(fetched=len(page), written=append_to_raw(page))

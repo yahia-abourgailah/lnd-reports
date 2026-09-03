@@ -19,7 +19,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import BigInteger, DateTime, Index, String, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from lnd.db import SCHEMA_RAW, Base
@@ -92,9 +92,13 @@ class RawRecord(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    #: Which sync produced this row. The ops.sync_run table arrives in week 2;
-    #: until then this is populated but unconstrained.
-    sync_run_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), nullable=True)
+    #: Which sync produced this row — `ops.sync_run.id`, which landed in week 2
+    #: as a BigInteger rather than the UUID this column first assumed.
+    #:
+    #: Deliberately not a foreign key: `raw` has to stay writable while `ops` is
+    #: being maintained, and pruning old audit rows must never cascade into
+    #: deleting the payloads they fetched.
+    sync_run_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     def __repr__(self) -> str:
         return (

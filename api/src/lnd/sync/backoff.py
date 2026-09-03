@@ -11,6 +11,13 @@ a 401 does not, and will not until someone rotates a credential. Retrying it
 turns one authentication failure into three, delays the honest error by the
 whole backoff budget, and can lock the account. The caller names the exceptions
 worth repeating, and everything else propagates on the first raise.
+
+The exception type is not always enough to decide, though. A client that raises
+one error class for everything — `CrmError` covers both the 503 and the 401 —
+has already classified the failure itself, and re-deriving that here from status
+codes would be a second opinion free to disagree with the first. So there are
+two gates: `retry_on` matches the type, and `retry_if` asks the instance. Both
+must agree before an attempt is repeated.
 """
 
 from __future__ import annotations
@@ -69,19 +76,40 @@ class RetryPolicy:
         return max(delay, 0.0)
 
 
+def honours_retryable_flag(exception: Exception) -> bool:
+    """Defer to an exception that has already classified itself.
+
+    A client raising one error class for every failure usually carries the
+    verdict on the instance — `CrmError.retryable` is `True` for a 503 and
+    `False` for a 401. Reading it beats re-deriving the same judgement from
+    status codes in a second place that is free to disagree.
+
+    Absent the attribute the answer is yes, because the caller listing the type
+    in `retry_on` is itself the claim that it is worth repeating.
+    """
+    return bool(getattr(exception, "retryable", True))
+
+
 def retry[T](
     operation: Callable[[], T],
     *,
     retry_on: tuple[type[Exception], ...],
+    retry_if: Callable[[Exception], bool] | None = None,
     policy: RetryPolicy | None = None,
     describe: str = "operation",
     sleep: Callable[[float], None] = time.sleep,
 ) -> T:
     """Call `operation`, repeating it while it raises one of `retry_on`.
 
+    `retry_if` narrows that further: an exception is repeated only if its type
+    matches *and* the predicate agrees. Pass `honours_retryable_flag` for a
+    client whose errors carry their own verdict.
+
     Returns its result, or re-raises the last failure once the attempts are
     spent — so the caller sees the real exception rather than a wrapper, and
-    `record_sync_run` stamps the source's own error type on the run.
+    `record_sync_run` stamps the source's own error type on the run. An
+    exception the predicate rejects is re-raised immediately, on its first
+    occurrence, with nothing slept.
 
     `sleep` is injectable so tests exercise the delays without waiting them.
     """
@@ -91,6 +119,18 @@ def retry[T](
         try:
             return operation()
         except retry_on as exc:
+            if retry_if is not None and not retry_if(exc):
+                log.info(
+                    "not retrying; the failure is not transient",
+                    extra={
+                        "event": "sync.retry.refused",
+                        "operation": describe,
+                        "attempt": attempt,
+                        "error_type": type(exc).__name__,
+                    },
+                )
+                raise
+
             if attempt == policy.attempts:
                 log.warning(
                     "retries exhausted",
