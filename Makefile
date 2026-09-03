@@ -82,8 +82,8 @@ types: ## mypy
 	cd api && mypy src
 
 .PHONY: test
-test: ## pytest with coverage
-	cd api && pytest
+test: ## pytest with coverage (landing tests need the dev db up)
+	cd api && TEST_DATABASE_URL="postgresql+psycopg://$$(grep -E '^POSTGRES_USER=' ../.env | cut -d= -f2):$$(grep -E '^POSTGRES_PASSWORD=' ../.env | cut -d= -f2)@127.0.0.1:5432/$$(grep -E '^POSTGRES_DB=' ../.env | cut -d= -f2)" pytest
 
 .PHONY: check
 check: lint types test ## Everything CI runs on the API

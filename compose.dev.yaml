@@ -45,15 +45,44 @@ services:
     environment:
       PYTHONPATH: /srv/src
 
+  # db and redis are on the `internal: true` backend network, and Docker will
+  # not publish a host port from an internal-only network — it fails silently,
+  # rendering the port in `compose config` but never binding it. Attaching them
+  # to `edge` as well gives the publish somewhere to bind.
+  #
+  # This is a dev-only concession so psql, a GUI client and host-run tests can
+  # attach. staging and production keep them on `backend` alone, unreachable
+  # from anywhere outside the compose project.
   db:
-    # Published locally so psql and a GUI client can attach. Never published in
-    # staging or production.
+    networks: [backend, edge]
     ports:
       - "127.0.0.1:5432:5432"
 
   redis:
+    networks: [backend, edge]
     ports:
       - "127.0.0.1:6379:6379"
 
+  # pgAdmin, with the connection pre-configured so there is nothing to set up —
+  # expand Schemas and the tables are there. Dev only, like adminer.
+  pgadmin:
+    image: dpage/pgadmin4:8
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      PGADMIN_DISABLE_POSTFIX: "True"
+    volumes:
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - pgadmin-data:/var/lib/pgadmin
+    ports:
+      - "127.0.0.1:8082:80"
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [edge, backend]
+    restart: unless-stopped
+
 volumes:
   web-node-modules:
+  pgadmin-data:

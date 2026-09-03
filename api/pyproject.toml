@@ -93,7 +93,7 @@ disallow_untyped_decorators = false
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]  # "." so tests.fixtures is importable
 addopts = "-q --cov=lnd --cov-report=term-missing"
 filterwarnings = ["error::DeprecationWarning:lnd.*"]
 

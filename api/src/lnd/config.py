@@ -53,6 +53,25 @@ class Settings(BaseSettings):
     oidc_scopes: str = "openid profile email"
     oidc_redirect_uri: str = "http://localhost:8080/v1/auth/callback"
 
+    # -- source systems -----------------------------------------------------
+    # Blank until the CRM team issues read-only API access (risk R-01). The API
+    # starts fine without them; only the sync tasks need them, and they say so
+    # clearly when they run.
+    crm_base_url: str = ""
+    #: Static shared secret, sent in the X-Learning-Key header. Not a JWT, does
+    #: not expire, never leaves the server side. Issued by the CRM team as
+    #: LEARNING_INTEGRATION_SERVICE_KEY on their deployment.
+    crm_service_key: str = Field(default="", repr=False)
+    crm_timeout_seconds: float = 60.0
+    #: Each entry carries a program's whole roster and every answer on it, so a
+    #: big page is a big response. 10-25 is the documented comfortable size.
+    crm_per_page: int = 10
+
+    #: Save every source response verbatim as a contract fixture. Off by
+    #: default — an accidental recording against production would write real
+    #: employee payloads into the repository.
+    source_record_fixtures: bool = False
+
     # -- development-only auth shortcut -------------------------------------
     auth_dev_bypass: bool = False
     auth_dev_user_email: str = "dev@example.com"
@@ -105,6 +124,12 @@ class Settings(BaseSettings):
 
         if self.is_production and not self.oidc_redirect_uri.startswith("https://"):
             raise ValueError("OIDC_REDIRECT_URI must be https:// in production.")
+
+        if self.source_record_fixtures and self.is_production:
+            raise ValueError(
+                "SOURCE_RECORD_FIXTURES writes source payloads to disk and must "
+                "never be enabled in production — those payloads contain PII."
+            )
 
         return self
 

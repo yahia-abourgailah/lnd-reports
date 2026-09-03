@@ -51,8 +51,8 @@ def create_app() -> FastAPI:
         title="L&D Analytics Platform",
         version=__version__,
         description=(
-            "Read-only analytics over the CRM, Microsoft Forms, the HRIS and "
-            "LinkedIn Learning. No endpoint writes to any source system."
+            "Read-only analytics over the CRM, the HRIS and LinkedIn Learning. "
+            "No endpoint writes to any source system."
         ),
         lifespan=lifespan,
         # The schema is internal documentation, not a public contract.

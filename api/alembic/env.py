@@ -14,6 +14,9 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+# lnd.ingest.models is imported for its side effect: importing it registers the
+# raw tables on Base.metadata. Without it, `alembic revision --autogenerate`
+# sees an empty schema and proposes dropping every table that exists.
 from lnd.db import SCHEMAS, Base
 
 config = context.config

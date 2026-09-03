@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "L&D Analytics (dev)",
+      "Group": "Servers",
+      "Host": "db",
+      "Port": 5432,
+      "MaintenanceDB": "lnd",
+      "Username": "lnd",
+      "SSLMode": "prefer",
+      "Comment": "Tables live in raw / core / app / ops — public is empty by design."
+    }
+  }
+}
