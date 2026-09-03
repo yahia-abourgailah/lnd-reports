@@ -14,10 +14,11 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-# Imported for its side effect: the package registers every model on
-# Base.metadata. Without it autogenerate sees an empty model set and proposes
-# dropping the tables that are actually there.
-import lnd.models  # noqa: F401
+# Imported for their side effects: each registers models on Base.metadata.
+# Without them autogenerate sees an empty model set and proposes dropping the
+# tables that are actually there.
+import lnd.ingest.models
+import lnd.models
 from lnd.db import SCHEMAS, Base
 
 config = context.config

@@ -71,7 +71,7 @@ services:
 
   # ----------------------------------------------------------------- worker
   # Celery: sync, transform, exports, email. Never reachable from `edge`;
-  # `egress` gives it outbound access to the CRM, Graph, the HRIS and SMTP.
+  # `egress` gives it outbound access to the CRM, the HRIS, LinkedIn and SMTP.
   worker:
     <<: *api-image
     command: ["celery", "-A", "lnd.worker.celery_app:celery_app", "worker",
@@ -81,8 +81,10 @@ services:
       db:    { condition: service_healthy }
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "celery", "-A", "lnd.worker.celery_app:celery_app",
-             "inspect", "ping", "--destination", "celery@$${HOSTNAME}"]
+      # CMD-SHELL, not CMD: the exec form does no variable expansion, so
+      # $HOSTNAME would be pinged literally and every check would fail.
+      test: ["CMD-SHELL",
+             "celery -A lnd.worker.celery_app:celery_app inspect ping -d celery@$$HOSTNAME"]
       interval: 60s
       timeout: 10s
       retries: 3

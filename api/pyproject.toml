@@ -66,6 +66,8 @@ ignore = [
 # S608: the DDL in 0001 interpolates only module-level constants — role and
 # schema names — which is unavoidable, since neither can be a bind parameter.
 "alembic/versions/*" = ["E501", "S608"]
+# env.py imports the model packages purely for their registration side effect.
+"alembic/env.py" = ["F401"]
 
 # ---------------------------------------------------------------------------
 # mypy
@@ -93,7 +95,7 @@ disallow_untyped_decorators = false
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]  # "." so tests.fixtures is importable
 addopts = "-q --cov=lnd --cov-report=term-missing"
 filterwarnings = ["error::DeprecationWarning:lnd.*"]
 

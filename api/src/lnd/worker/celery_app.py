@@ -3,14 +3,13 @@
 Same image as the API, different command. The schedule is declared here so
 there is one place to read what the platform does unattended:
 
-    every 30 minutes   incremental sync on source updated_at   (FR-A07)
-    nightly            full reconcile, catching deletes and    (FR-A08)
-                       silent edits incremental cannot see
+    every 30 minutes   pull every program, land what changed    (FR-A07)
+    nightly            the same pull, plus deletion reconcile   (FR-A08)
     monthly            generate and email the L&D report       (FR-E05)
 
-Week 1 registers the schedule and a heartbeat only. The tasks themselves land
-in weeks 2, 3 and 9; each entry points at a stub that logs and returns, so beat
-is exercised end to end from day one rather than first switched on in week 9.
+Each entry points at a stub that logs and returns, so beat is exercised end to
+end from day one rather than first switched on in week 9. The sync
+implementation is Person B's week-2 work and lives elsewhere.
 """
 
 from __future__ import annotations
@@ -80,14 +79,14 @@ def heartbeat() -> dict[str, str]:
 
 @celery_app.task(name="lnd.sync.incremental")
 def sync_incremental() -> dict[str, str]:
-    """Week 2. Incremental pull per source on updated_at, with a watermark."""
+    """The scheduled 30-minute pass (FR-A07)."""
     log.info("incremental sync (not yet implemented)", extra={"event": "sync.incremental.stub"})
     return {"status": "not_implemented"}
 
 
 @celery_app.task(name="lnd.sync.full_reconcile")
 def sync_full_reconcile() -> dict[str, str]:
-    """Week 2. Nightly full pull; soft-deletes what vanished at source."""
+    """The nightly pass, which also reconciles deletions (FR-A08)."""
     log.info("full reconcile (not yet implemented)", extra={"event": "sync.full.stub"})
     return {"status": "not_implemented"}
 

@@ -1,0 +1,51 @@
+"""CRM Learning Programs — the system of record for training delivery."""
+
+from lnd.sources.crm.client import (
+    KEY_HEADER,
+    PROGRAMS_PATH,
+    CrmClient,
+    CrmError,
+    parse_page,
+    parse_programs,
+    program_id_of,
+)
+from lnd.sources.crm.models import (
+    AssessmentAnswer,
+    AttendanceRow,
+    Company,
+    PageMeta,
+    Program,
+    ProgramsPage,
+    ProgramStatus,
+    ProgramTarget,
+    ProgramType,
+    RosterEntry,
+    SessionRow,
+    Statistics,
+    SurveyAnswer,
+    User,
+)
+
+__all__ = [
+    "KEY_HEADER",
+    "PROGRAMS_PATH",
+    "AssessmentAnswer",
+    "AttendanceRow",
+    "Company",
+    "CrmClient",
+    "CrmError",
+    "PageMeta",
+    "Program",
+    "ProgramStatus",
+    "ProgramTarget",
+    "ProgramType",
+    "ProgramsPage",
+    "RosterEntry",
+    "SessionRow",
+    "Statistics",
+    "SurveyAnswer",
+    "User",
+    "parse_page",
+    "parse_programs",
+    "program_id_of",
+]

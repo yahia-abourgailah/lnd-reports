@@ -83,12 +83,9 @@ jobs:
       - name: Type-check
         run: mypy src
 
-      - name: Tests
-        run: pytest
-
-      # The baseline creates roles and sets default privileges, which only a
-      # real Postgres will accept. Applying it here means a broken migration
-      # fails the build rather than the deploy.
+      # Migrations run before the tests: the baseline creates roles and sets
+      # default privileges that only a real Postgres will accept, and the
+      # landing tests assert those grants directly.
       - name: Migrations apply to an empty database
         env:
           DATABASE_URL: postgresql+psycopg://lnd:lnd@localhost:5432/lnd_test
@@ -98,6 +95,19 @@ jobs:
         env:
           DATABASE_URL: postgresql+psycopg://lnd:lnd@localhost:5432/lnd_test
         run: alembic upgrade head
+
+      - name: Tests
+        env:
+          # Landing, idempotency and replay are properties of PostgreSQL, so
+          # they run against the service container. Without this they skip, and
+          # a skipped guarantee is not a guarantee.
+          TEST_DATABASE_URL: postgresql+psycopg://lnd:lnd@localhost:5432/lnd_test
+        run: pytest
+
+      - name: The database tests actually ran
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg://lnd:lnd@localhost:5432/lnd_test
+        run: pytest tests/test_landing.py -q --no-header -p no:cacheprovider --no-cov -x
 
   # ---------------------------------------------------------------------- web
   web:

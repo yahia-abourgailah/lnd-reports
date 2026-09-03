@@ -5,12 +5,19 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Connection, Engine, create_engine, delete, func, select
+from sqlalchemy import Connection, Engine, create_engine, delete, func, select, text
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
 
-from lnd import db
+from lnd import db as lnd_db
 from lnd.config import get_settings
 from lnd.models import AlertNotification, SyncRun
+
+# Captured at import, before the autouse fixture below replaces DATABASE_URL
+# with a deliberately unreachable one. Tests that need a real database read
+# this instead; without it they skip rather than fail.
+#   make test  supplies it from .env; CI supplies its service container.
+REAL_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "")
 
 BASE_ENV = {
     "ENVIRONMENT": "dev",
@@ -25,14 +32,14 @@ BASE_ENV = {
 
 
 def _reset_caches() -> None:
-    from lnd import db
+    from lnd import db as lnd_db
     from lnd.auth import oidc, session
     from lnd.config import get_settings
 
     get_settings.cache_clear()
     oidc.reset_caches()
     session._dev_secret = None
-    db.dispose_engine()
+    lnd_db.dispose_engine()
 
 
 @pytest.fixture(autouse=True)
@@ -122,9 +129,9 @@ def live_db(db_engine: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[None
     """
     monkeypatch.setenv("DATABASE_URL", db_engine.url.render_as_string(hide_password=False))
     get_settings.cache_clear()
-    db.dispose_engine()
+    lnd_db.dispose_engine()
 
-    with db.session_scope() as session:
+    with lnd_db.session_scope() as session:
         marks = {
             model: session.scalar(select(func.coalesce(func.max(model.id), 0))) or 0
             for model in (SyncRun, AlertNotification)
@@ -132,10 +139,10 @@ def live_db(db_engine: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[None
 
     yield
 
-    with db.session_scope() as session:
+    with lnd_db.session_scope() as session:
         for model, high_water in marks.items():
             session.execute(delete(model).where(model.id > high_water))
-    db.dispose_engine()
+    lnd_db.dispose_engine()
     get_settings.cache_clear()
 
 
@@ -151,3 +158,41 @@ def dev_bypass_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
 
     with TestClient(create_app(), follow_redirects=False) as test_client:
         yield test_client
+
+
+# ---------------------------------------------------------------------------
+# the raw landing layer
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def db(db_engine: Engine) -> Iterator[Session]:
+    """A session over the raw layer, inside a transaction that is rolled back.
+
+    Builds on `db_engine` above, so there is one decision about database
+    reachability rather than two. The raw table is created if the database has
+    not had migrations applied, so the landing tests run against a bare dev
+    database as well as a migrated one.
+
+    Starts from empty: a dev database carries rows from real syncs, and a test
+    asserting "exactly one record" would otherwise pass or fail depending on
+    what someone did in the terminal an hour ago. TRUNCATE is transactional in
+    PostgreSQL, so the rollback puts every existing row back.
+    """
+    from lnd.db import SCHEMAS, Base
+    from lnd.ingest.models import RawRecord
+
+    with db_engine.begin() as setup:
+        for schema in SCHEMAS:
+            setup.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+    Base.metadata.create_all(db_engine, tables=[RawRecord.__table__], checkfirst=True)
+
+    connection = db_engine.connect()
+    transaction = connection.begin()
+    connection.execute(text("TRUNCATE raw.source_record RESTART IDENTITY"))
+
+    session = Session(bind=connection, expire_on_commit=False)
+    try:
+        yield session
+    finally:
+        session.close()
+        transaction.rollback()
+        connection.close()
