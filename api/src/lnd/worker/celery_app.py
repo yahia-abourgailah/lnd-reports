@@ -59,6 +59,14 @@ celery_app.conf.update(
             # 07:00 on the first of the month, after the nightly reconcile.
             "schedule": crontab(day_of_month="1", hour="7", minute="0"),
         },
+        # More often than the 30-minute sync, so a failure is reported within a
+        # quarter of an hour rather than waiting for the next pull. Repetition
+        # is the notifier's job, not the schedule's — this may run as often as
+        # is useful without multiplying messages.
+        "alerts-evaluate": {
+            "task": "lnd.alerts.evaluate",
+            "schedule": crontab(minute="*/15"),
+        },
     },
 )
 
@@ -89,3 +97,28 @@ def monthly_report() -> dict[str, str]:
     """Week 9. Generate the monthly XLSX and email it, with no human step."""
     log.info("monthly report (not yet implemented)", extra={"event": "reports.monthly.stub"})
     return {"status": "not_implemented"}
+
+
+@celery_app.task(name="lnd.alerts.evaluate")
+def evaluate_alerts_task() -> dict[str, int]:
+    """Detect problems and notify anything not already reported.
+
+    Unlike the sync tasks above this is not a stub: every rule is a query over
+    `sync_run`, so it does real work today and will keep doing it unchanged once
+    the sources are connected.
+
+    One transaction for the whole evaluation. A failure part way through records
+    nothing rather than half-claiming to have notified.
+    """
+    from lnd.alerts import dispatch_alerts
+    from lnd.db import session_scope
+
+    with session_scope() as session:
+        result = dispatch_alerts(session)
+
+    return {
+        "raised": len(result.raised),
+        "repeated": len(result.repeated),
+        "suppressed": len(result.suppressed),
+        "resolved": len(result.resolved),
+    }

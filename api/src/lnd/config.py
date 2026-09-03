@@ -41,6 +41,54 @@ class Settings(BaseSettings):
 
     redis_url: str = "redis://redis:6379/0"
 
+    # -- sync ---------------------------------------------------------------
+    # An incremental pull resumes from the last successful position less this
+    # overlap. Source clocks are not our clock, and a record written at the
+    # exact moment of the last watermark must not fall between two windows.
+    # Re-reading a few minutes is free: the transform is idempotent (FR-A10).
+    sync_overlap_seconds: int = 300
+    # A run still marked `running` after this long was abandoned — the worker
+    # was killed rather than the sync being slow. Comfortably above Celery's
+    # 30-minute hard time limit, so a merely slow sync is never reaped out from
+    # under itself.
+    sync_abandoned_after_seconds: int = 2400
+    # Freshness lag past which the badge turns amber and the alert fires
+    # (NFR-03). Two missed 30-minute runs, so a single failure that the next
+    # run recovers from does not wake anyone.
+    freshness_stale_after_seconds: int = 3600
+
+    # -- retry and the circuit breaker --------------------------------------
+    # Attempts within one sync before it gives up and the run is recorded
+    # failed. Delays grow base * multiplier ** (attempt - 1), capped, jittered.
+    retry_attempts: int = 3
+    retry_base_delay_seconds: float = 1.0
+    retry_max_delay_seconds: float = 30.0
+    # Spread as a fraction of the delay. Without it every entity that failed in
+    # the same beat tick retries in lockstep and hits a recovering source
+    # simultaneously — the thundering herd that stops it recovering.
+    retry_jitter: float = 0.25
+
+    # Consecutive failed runs for one source, ignoring skips, before it stops
+    # being called. Counted across the source's entities and reset by any
+    # success, so a whole-source outage trips it within a single beat tick
+    # while one flaky entity among healthy ones never does.
+    breaker_failure_threshold: int = 3
+    # How long the source is left alone before one trial call is allowed.
+    breaker_cooldown_seconds: int = 600
+
+    # -- alerting -----------------------------------------------------------
+    # How often an unresolved problem is repeated. A three-day outage evaluated
+    # every 15 minutes would otherwise send 288 messages, and the practical
+    # result of that is a muted channel and an unread real alert.
+    alert_renotify_seconds: int = 21600
+    # Soft deletes in one nightly reconcile above which the difference stops
+    # being routine. Absolute rather than proportional: the dataset is small
+    # and known (~15,000 rows at the ceiling), so a fixed number is easier to
+    # reason about than a percentage of a moving total.
+    alert_reconcile_delete_threshold: int = 25
+    # How far back a reconcile counts as current news.
+    alert_reconcile_window_seconds: int = 86400
+
     # -- session ------------------------------------------------------------
     session_secret: str = Field(default="", repr=False)
     session_cookie_name: str = "lnd_session"

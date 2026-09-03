@@ -5,6 +5,12 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import Connection, Engine, create_engine, delete, func, select
+from sqlalchemy.exc import OperationalError
+
+from lnd import db
+from lnd.config import get_settings
+from lnd.models import AlertNotification, SyncRun
 
 BASE_ENV = {
     "ENVIRONMENT": "dev",
@@ -49,6 +55,88 @@ def client() -> Iterator[TestClient]:
 
     with TestClient(create_app(), follow_redirects=False) as test_client:
         yield test_client
+
+
+@pytest.fixture(scope="session")
+def db_engine() -> Iterator[Engine]:
+    """One engine for the whole session, and one decision about reachability.
+
+    Constraints are the point of several tables in this codebase — raw's missing
+    UPDATE grant, sync_run's one-active-run index, and from week 3 the transform
+    invariant. None of them can be demonstrated against anything but PostgreSQL,
+    so those tests need a live database rather than SQLite.
+
+    Set `TEST_DATABASE_URL` to run them; the dev overlay publishes Postgres on
+    127.0.0.1:5432 for exactly this. They skip rather than fail when it is
+    absent, so `pytest` still works on a machine with nothing running — CI is
+    what guarantees they actually execute.
+
+    Session-scoped so an unreachable database costs one connect timeout for the
+    run rather than one per test, and `connect_timeout` is set because psycopg
+    otherwise waits indefinitely on a port nothing is listening on — which is
+    what a stack started without the dev overlay looks like.
+    """
+    url = os.environ.get("TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("TEST_DATABASE_URL is not set; skipping database integration tests")
+
+    engine = create_engine(url, connect_args={"connect_timeout": 5})
+    try:
+        with engine.connect():
+            pass
+    except OperationalError as exc:  # pragma: no cover - depends on the machine
+        engine.dispose()
+        pytest.skip(f"database at TEST_DATABASE_URL is not reachable: {exc.__class__.__name__}")
+
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture
+def db_connection(db_engine: Engine) -> Iterator[Connection]:
+    """A connection inside a transaction that is always rolled back.
+
+    Nothing a test writes survives it, so pointing TEST_DATABASE_URL at the dev
+    database leaves it exactly as it was found.
+    """
+    connection = db_engine.connect()
+    transaction = connection.begin()
+    try:
+        yield connection
+    finally:
+        transaction.rollback()
+        connection.close()
+
+
+@pytest.fixture
+def live_db(db_engine: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Point the application's own session factory at the test database.
+
+    For code that commits on purpose — `record_sync_run` has to, because the
+    audit of a failure must outlive the transaction that failed — and for
+    anything going through the API, where the request opens its own session.
+    Neither can use the rolled-back `db_connection`.
+
+    Notes the highest existing id on the way in and deletes everything above it
+    on the way out, so a dev database keeps whatever history it already had.
+    """
+    monkeypatch.setenv("DATABASE_URL", db_engine.url.render_as_string(hide_password=False))
+    get_settings.cache_clear()
+    db.dispose_engine()
+
+    with db.session_scope() as session:
+        marks = {
+            model: session.scalar(select(func.coalesce(func.max(model.id), 0))) or 0
+            for model in (SyncRun, AlertNotification)
+        }
+
+    yield
+
+    with db.session_scope() as session:
+        for model, high_water in marks.items():
+            session.execute(delete(model).where(model.id > high_water))
+    db.dispose_engine()
+    get_settings.cache_clear()
 
 
 @pytest.fixture

@@ -14,6 +14,10 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+# Imported for its side effect: the package registers every model on
+# Base.metadata. Without it autogenerate sees an empty model set and proposes
+# dropping the tables that are actually there.
+import lnd.models  # noqa: F401
 from lnd.db import SCHEMAS, Base
 
 config = context.config
@@ -26,7 +30,6 @@ if not database_url:
     raise RuntimeError("DATABASE_URL is not set; alembic has nothing to connect to.")
 config.set_main_option("sqlalchemy.url", database_url)
 
-# Models register themselves on Base.metadata as they arrive in week 3.
 target_metadata = Base.metadata
 
 
