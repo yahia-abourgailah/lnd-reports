@@ -304,6 +304,9 @@ class TestRunAll:
         assert summarise(summaries) == {
             "entities": 3,
             "fetched": 3,
+            # Only a full reconcile can conclude anything is absent, so an
+            # incremental always reports zero.
+            "deleted": 0,
             "landed": 3,
             "unchanged": 0,
             "skipped": 0,
@@ -354,3 +357,79 @@ class TestModes:
         assert stored.status is SyncStatus.SUCCESS
         assert stored.watermark_to is None
         assert len(_raw_rows()) == 1
+
+
+class TestFullReconcileDeletions:
+    """FR-A08: a full pass notices what the source has stopped returning.
+
+    `raw` is append-only, so a vanished record keeps every version it ever had
+    and simply stops being present — which is what lets week 10 say when a
+    program disappeared and which run noticed.
+    """
+
+    def test_a_program_that_vanishes_is_marked_absent(self, live_db: None) -> None:
+        from lnd.sync.presence import present_ids, vanished
+
+        run_sync(FakePuller([_program(87), _program(88)]), mode=SyncMode.FULL_RECONCILE)
+        summary = run_sync(FakePuller([_program(87)]), mode=SyncMode.FULL_RECONCILE)
+
+        assert summary.deleted == 1
+        with db.session_scope() as session:
+            assert present_ids(session, source=Source.CRM, entity=Entity.PROGRAM) == ["87"]
+            gone = vanished(session, source=Source.CRM, entity=Entity.PROGRAM)
+            assert [row.source_id for row in gone] == ["88"]
+            assert gone[0].vanished_at is not None
+
+    def test_nothing_is_erased_from_raw(self, live_db: None) -> None:
+        """The whole point of soft-deleting: the payload stays available."""
+        run_sync(FakePuller([_program(87), _program(88)]), mode=SyncMode.FULL_RECONCILE)
+        run_sync(FakePuller([_program(87)]), mode=SyncMode.FULL_RECONCILE)
+
+        assert sorted(row.source_id for row in _raw_rows()) == ["87", "88"]
+
+    def test_an_incremental_pass_never_concludes_a_record_is_gone(self, live_db: None) -> None:
+        """It sees a subset by construction. Treating that as the whole world
+        would soft-delete the catalogue every half hour."""
+        from lnd.sync.presence import present_ids
+
+        run_sync(FakePuller([_program(87), _program(88)]), mode=SyncMode.FULL_RECONCILE)
+        summary = run_sync(FakePuller([_program(87)]), mode=SyncMode.INCREMENTAL)
+
+        assert summary.deleted == 0
+        with db.session_scope() as session:
+            assert sorted(present_ids(session, source=Source.CRM, entity=Entity.PROGRAM)) == [
+                "87",
+                "88",
+            ]
+
+    def test_a_returning_program_is_present_again(self, live_db: None) -> None:
+        """Programs get unarchived. A resurrection should need no intervention."""
+        from lnd.sync.presence import present_ids
+
+        run_sync(FakePuller([_program(87), _program(88)]), mode=SyncMode.FULL_RECONCILE)
+        run_sync(FakePuller([_program(87)]), mode=SyncMode.FULL_RECONCILE)
+        run_sync(FakePuller([_program(87), _program(88)]), mode=SyncMode.FULL_RECONCILE)
+
+        with db.session_scope() as session:
+            assert sorted(present_ids(session, source=Source.CRM, entity=Entity.PROGRAM)) == [
+                "87",
+                "88",
+            ]
+
+    def test_the_count_reaches_the_audit_row(self, live_db: None) -> None:
+        """The alert rule watching for an implausible reconcile reads this."""
+        run_sync(FakePuller([_program(87), _program(88)]), mode=SyncMode.FULL_RECONCILE)
+        summary = run_sync(FakePuller([]), mode=SyncMode.FULL_RECONCILE)
+
+        assert _stored_run(summary.run_id).records_deleted == 2
+
+    def test_one_source_vanishing_does_not_touch_another(self, live_db: None) -> None:
+        from lnd.sync.presence import present_ids
+
+        run_sync(FakePuller([_program(87)], entity=Entity.SESSION), mode=SyncMode.FULL_RECONCILE)
+        run_sync(FakePuller([_program(88)]), mode=SyncMode.FULL_RECONCILE)
+        run_sync(FakePuller([]), mode=SyncMode.FULL_RECONCILE)
+
+        with db.session_scope() as session:
+            assert present_ids(session, source=Source.CRM, entity=Entity.PROGRAM) == []
+            assert present_ids(session, source=Source.CRM, entity=Entity.SESSION) == ["87"]

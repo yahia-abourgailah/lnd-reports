@@ -1,0 +1,892 @@
+<title>L&amp;D Analytics Build Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+
+<style>
+:root{
+  --ground:#F1F4F3; --surface:#FFFFFF; --surface-2:#E7ECEA;
+  --ink:#111A1B; --ink-2:#3B4A4B; --ink-3:#66787A;
+  --rule:#D3DBD9; --rule-2:#B7C3C0;
+  --accent:#14675C; --accent-soft:#DBEAE6;
+  --a:#1D5A85; --b:#8A6014;
+  --warn:#8E5E10; --warn-soft:#F4E8D0;
+  --crit:#9E3722; --crit-soft:#F5DFD8;
+  --good:#2A6640; --good-soft:#DCEADF;
+  --shadow:0 1px 2px rgba(17,26,27,.06),0 8px 24px -16px rgba(17,26,27,.28);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0D1213; --surface:#141B1C; --surface-2:#1B2425;
+    --ink:#E5EDEB; --ink-2:#B2C0BE; --ink-3:#7C8D8B;
+    --rule:#25302F; --rule-2:#37474A;
+    --accent:#4FC0AA; --accent-soft:#0F2E2A;
+    --a:#71B6E0; --b:#DDB35C;
+    --warn:#D6A342; --warn-soft:#31260F;
+    --crit:#E17E66; --crit-soft:#371C15;
+    --good:#6FBE87; --good-soft:#152E1D;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0D1213; --surface:#141B1C; --surface-2:#1B2425;
+  --ink:#E5EDEB; --ink-2:#B2C0BE; --ink-3:#7C8D8B;
+  --rule:#25302F; --rule-2:#37474A;
+  --accent:#4FC0AA; --accent-soft:#0F2E2A;
+  --a:#71B6E0; --b:#DDB35C;
+  --warn:#D6A342; --warn-soft:#31260F;
+  --crit:#E17E66; --crit-soft:#371C15;
+  --good:#6FBE87; --good-soft:#152E1D;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.8);
+}
+
+*{box-sizing:border-box}
+body{background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:14.5px; line-height:1.55; -webkit-font-smoothing:antialiased}
+.wrap{max-width:1020px; margin:0 auto; padding:0 26px 80px}
+
+.topbar{position:sticky; top:0; z-index:50;
+  background:color-mix(in srgb, var(--ground) 92%, transparent);
+  backdrop-filter:blur(10px); border-bottom:1px solid var(--rule)}
+.topbar-in{max-width:1020px; margin:0 auto; padding:8px 26px; display:flex; align-items:center; gap:16px}
+.mark{font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:600; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--accent); white-space:nowrap}
+.navscroll{display:flex; gap:2px; overflow-x:auto; scrollbar-width:thin}
+.navscroll a{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3);
+  text-decoration:none; padding:4px 8px; border-radius:4px; white-space:nowrap}
+.navscroll a:hover{color:var(--ink); background:var(--surface-2)}
+.navscroll a:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+
+.mast{padding:48px 0 30px; border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin:0 0 14px}
+h1{font-family:"Newsreader",Georgia,serif; font-weight:500; font-size:clamp(32px,5.2vw,50px);
+  line-height:1.05; letter-spacing:-.02em; margin:0 0 14px; text-wrap:balance}
+.standfirst{font-size:16.5px; line-height:1.5; color:var(--ink-2); max-width:62ch; margin:0}
+.facts{display:grid; grid-template-columns:repeat(auto-fit,minmax(135px,1fr)); gap:1px;
+  background:var(--rule); border:1px solid var(--rule); margin-top:26px}
+.fact{background:var(--ground); padding:13px 15px}
+.fact dt{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); margin:0 0 5px}
+.fact dd{margin:0; font-size:14px; font-weight:600}
+
+section{padding-top:44px; scroll-margin-top:54px}
+h2{font-family:"Newsreader",Georgia,serif; font-weight:500; font-size:27px; letter-spacing:-.015em;
+  margin:0 0 4px; text-wrap:balance}
+h2 .num{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--accent);
+  letter-spacing:.06em; display:block; margin-bottom:8px}
+h3{font-size:15px; font-weight:600; margin:24px 0 8px}
+p{margin:0 0 12px; max-width:74ch}
+.lede{font-size:15.5px; color:var(--ink-2); max-width:70ch; margin-bottom:16px}
+ul,ol{margin:0 0 14px; padding-left:19px; max-width:74ch}
+li{margin-bottom:5px}
+li::marker{color:var(--ink-3)}
+strong{font-weight:600}
+a{color:var(--accent)}
+
+.tw{overflow-x:auto; margin:16px 0 22px; border:1px solid var(--rule); background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-size:13px; min-width:520px}
+th{text-align:left; font-family:"IBM Plex Mono",monospace; font-size:10px; font-weight:600;
+  letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3);
+  padding:9px 13px; border-bottom:1px solid var(--rule-2); white-space:nowrap}
+td{padding:9px 13px; border-bottom:1px solid var(--rule); vertical-align:top; color:var(--ink-2)}
+tr:last-child td{border-bottom:none}
+td:first-child{color:var(--ink)}
+.n{font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap}
+code,.mono{font-family:"IBM Plex Mono",monospace; font-size:.9em}
+td code{background:var(--surface-2); padding:1px 4px; border-radius:3px; color:var(--ink)}
+.id{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--accent); white-space:nowrap}
+
+.chip{display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:9.5px; font-weight:600;
+  letter-spacing:.07em; text-transform:uppercase; padding:1px 6px; border-radius:3px; white-space:nowrap}
+.chip.should{background:var(--surface-2); color:var(--ink-3)}
+.chip.hi{background:var(--crit-soft); color:var(--crit)}
+.chip.med{background:var(--warn-soft); color:var(--warn)}
+.chip.lo{background:var(--good-soft); color:var(--good)}
+.chip.new{background:var(--warn-soft); color:var(--warn)}
+.chip.ask{background:var(--accent-soft); color:var(--accent)}
+.chip.drop{background:var(--surface-2); color:var(--ink-3)}
+
+.note{border-left:3px solid var(--accent); background:var(--surface); padding:14px 18px; margin:18px 0;
+  box-shadow:var(--shadow)}
+.note.crit{border-left-color:var(--crit)}
+.note .t{font-family:"IBM Plex Mono",monospace; font-size:10px; font-weight:600; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--accent); margin:0 0 6px}
+.note.crit .t{color:var(--crit)}
+.note p:last-child{margin-bottom:0}
+
+pre{background:var(--surface-2); border:1px solid var(--rule); padding:14px 16px; overflow-x:auto;
+  margin:14px 0 20px; font-size:12px; line-height:1.55; border-radius:2px}
+pre code{font-family:"IBM Plex Mono",monospace; color:var(--ink-2); background:none; padding:0}
+.cm{color:var(--ink-3)} .kw{color:var(--accent)}
+
+.phase{margin:26px 0 3px; padding:11px 16px; background:var(--ink); color:var(--ground);
+  display:flex; flex-wrap:wrap; gap:4px 14px; align-items:baseline}
+.phase .r{font-weight:700; font-size:15px; letter-spacing:-.012em}
+.phase .w{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.06em; opacity:.7}
+.week{background:var(--surface); border:1px solid var(--rule); margin:9px 0; box-shadow:var(--shadow)}
+.wk-h{display:flex; flex-wrap:wrap; gap:6px 12px; align-items:baseline; padding:9px 15px;
+  border-bottom:1px solid var(--rule); background:var(--surface-2)}
+.wk-h .no{font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:11px; letter-spacing:.06em}
+.wk-h .ti{font-weight:600; font-size:14.5px; letter-spacing:-.01em}
+.lanes{display:grid; grid-template-columns:1fr 1fr}
+.lane{padding:13px 15px}
+.lane:first-child{border-right:1px solid var(--rule)}
+.lane .who{font-family:"IBM Plex Mono",monospace; font-size:9.5px; font-weight:600; letter-spacing:.11em;
+  text-transform:uppercase; margin:0 0 8px; display:flex; align-items:center; gap:6px}
+.lane .who::before{content:""; width:8px; height:8px; border-radius:2px; flex:none}
+.lane.A .who{color:var(--a)} .lane.A .who::before{background:var(--a)}
+.lane.B .who{color:var(--b)} .lane.B .who::before{background:var(--b)}
+.lane ul{margin:0; padding-left:15px; font-size:13.2px; line-height:1.48; max-width:none}
+.lane li{margin-bottom:5px; color:var(--ink-2)}
+.lane li:last-child{margin-bottom:0}
+.lane.A li::marker{color:var(--a)} .lane.B li::marker{color:var(--b)}
+.lane li b{color:var(--ink); font-weight:600}
+/* what we actually did, where it differed from the plan */
+.lane li i{color:var(--ink-3); font-style:normal}
+.check{padding:9px 15px; border-top:1px solid var(--rule); background:var(--good-soft);
+  font-size:12.8px; color:var(--ink-2); line-height:1.45}
+.check b{font-family:"IBM Plex Mono",monospace; font-size:9.5px; font-weight:600; letter-spacing:.11em;
+  text-transform:uppercase; color:var(--good); display:block; margin-bottom:3px}
+.check.gate{background:var(--crit-soft)} .check.gate b{color:var(--crit)}
+
+footer{margin-top:48px; padding-top:20px; border-top:2px solid var(--ink); font-size:11.5px;
+  color:var(--ink-3); font-family:"IBM Plex Mono",monospace; letter-spacing:.04em; line-height:1.8}
+
+@media (max-width:740px){.lanes{grid-template-columns:1fr}
+  .lane:first-child{border-right:none; border-bottom:1px solid var(--rule)}}
+@media (max-width:600px){.wrap{padding:0 16px 60px}.topbar-in{padding:8px 16px}
+  .mast{padding:34px 0 24px}h2{font-size:23px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <span class="mark">L&amp;D Analytics</span>
+    <nav class="navscroll">
+      <a href="#what">What &amp; why</a>
+      <a href="#arch">Architecture</a>
+      <a href="#infra">Infra &amp; Docker</a>
+      <a href="#model">Data model</a>
+      <a href="#metrics">Metrics</a>
+      <a href="#app">API &amp; screens</a>
+      <a href="#weeks">Ten weeks</a>
+      <a href="#quality">Quality &amp; security</a>
+      <a href="#cutover">Cutover</a>
+      <a href="#risk">Team &amp; risks</a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Delivery plan · BRD v1.5 · CRM integration live · 2 September 2026</p>
+  <h1>L&amp;D Analytics Platform</h1>
+  <p class="standfirst">Replacing <code>L&amp;D Main Reports.xlsx</code> with a read-only analytics
+  platform over the CRM and LinkedIn Learning. Ten weeks, two engineers, six phases.
+  <strong>The CRM connection is live</strong> — 57 programs land in the raw layer, and every one of them
+  validates against the typed models.</p>
+  <dl class="facts">
+    <div class="fact"><dt>Duration</dt><dd>10 weeks</dd></div>
+    <div class="fact"><dt>Team</dt><dd>2 engineers</dd></div>
+    <div class="fact"><dt>Stack</dt><dd>FastAPI · Postgres · React</dd></div>
+    <div class="fact"><dt>Sources</dt><dd>CRM · LinkedIn</dd></div>
+    <div class="fact"><dt>Deploy</dt><dd>Docker Compose</dd></div>
+    <div class="fact"><dt>Weeks 1&ndash;2</dt><dd>Complete</dd></div>
+    <div class="fact"><dt>Open questions</dt><dd>Q-15 only</dd></div>
+    <div class="fact"><dt>Programs in CRM</dt><dd>57 — measured</dd></div>
+    <div class="fact"><dt>Gate</dt><dd>Signed reconciliation</dd></div>
+  </dl>
+</header>
+
+<!-- ============ WHAT ============ -->
+<section id="what">
+  <h2><span class="num">01</span>What we are building, and why</h2>
+  <p class="lede">The report is assembled by hand in Excel: 8&ndash;12 hours per cycle, covering 25 of the
+  <strong>57</strong> programs the CRM actually holds, with defects provable from the file. The replacement
+  syncs from two sources &mdash; the CRM and a LinkedIn Learning export &mdash; computes every metric from
+  one audited definition, and reports automatically. <strong>Read-only against the CRM</strong> &mdash; no
+  write-back, enforced by the absence of a write client and by a read-only credential.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>ID</th><th>Defect today</th><th>Fixed by</th></tr></thead>
+      <tbody>
+        <tr><td class="id">P-01</td><td>Participation rate divides by a hardcoded 192; HR holds 212</td><td><code>headcount_as_of()</code> over SCD2 employees</td></tr>
+        <tr><td class="id">P-13</td><td>Worse: the 212 roster is <b>one company</b>, while attendees span 3 domains and 4 code prefixes &mdash; 18 of 128 are outside it</td><td>Denominator is the <b>CRM-enrollable employee population</b> (Q-15) &mdash; the same population the numerator comes from, so the ratio is consistent by construction</td></tr>
+        <tr><td class="id">P-02</td><td>Pivots key on program title, so two "Hard Talks" merge into one</td><td><code>dim_program</code> keyed on <code>crm_program_id</code></td></tr>
+        <tr><td class="id">P-03</td><td>NPS and 3 quality scores published over a hidden <code>Completion Time</code> filter dropping 22 of 77 responses</td><td>Metric scope is explicit and total; any filter is a declared parameter, never inherited. Answers come from the CRM payload — 53 of 57 programs carry a survey</td></tr>
+        <tr><td class="id">P-04</td><td>Ahmed Elshiaty and Ahmed ElShiaty treated as two people — live CRM data confirms it, 10 sessions against 4</td><td>Request a trainer reference from the CRM, as was done for sector and job level. <code>dim_trainer</code> keys on that id, never on the typed name</td></tr>
+        <tr><td class="id">P-05</td><td>Trailing whitespace splits <code>Projects</code> (28) from <code>Projects&nbsp;</code> (41)</td><td>Normalisation on ingest; unknowns to the queue</td></tr>
+        <tr><td class="id">P-06</td><td>Three grains in one flat table &mdash; duration on 39 of 415 rows</td><td>Three fact tables at three grains</td></tr>
+        <tr><td class="id">P-07</td><td><s>38 rows <code>Employee Code = 'N/A'</code>, 14 <code>Email = 'New Hire'</code></s> — an export artefact. The CRM has <b>0</b></td><td><b>Closed.</b> 417 people, 417 codes, 417 odoo ids — a perfect 1:1. Identity is a join on <code>employee_code</code>; quarantine stays for anything that ever breaks it</td></tr>
+        <tr><td class="id">P-08</td><td>CRM has <b>57</b> programs — measured, not estimated; the workbook reports 25</td><td>Sync all programs from the CRM. Done: all 57 are in the raw layer</td></tr>
+        <tr><td class="id">P-09</td><td>Top Learner hand-typed; <code>=B95</code> points at a count cell</td><td>Rankings derived from <code>fact_attendance</code></td></tr>
+        <tr><td class="id">P-10</td><td><code>Top Learner!E3</code> references a workbook that is not present</td><td>Position comes from the CRM user object, alongside department, company, sector and job level</td></tr>
+        <tr><td class="id">P-11</td><td>No funnel or response rate &mdash; 77 evaluations against 415 attendances</td><td>Funnel view, Survey Response Rate metric</td></tr>
+        <tr><td class="id">P-12</td><td>The <code>#</code> column is not a session key &mdash; 117 values, 99 appear once, 18 repeat</td><td>Session identity from the CRM, which holds sessions back to September 2025 &mdash; the workbook backfill is dropped</td></tr>
+        <tr><td class="id">P-14</td><td>LinkedIn tracking hand-typed in <code>Linked In no</code> — previously mis-numbered P-09, which is the Top Learner defect</td><td>Scheduled LinkedIn export, one row per learner per course</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Scope</h3>
+  <p><strong>In:</strong> CRM and LinkedIn integration · dimensional model and metric layer ·
+  enrichment admin · dashboard with filters and drill-through · coverage, funnel and scorecards · CSV, XLSX
+  and PDF export · scheduled email · exception console · history from the CRM back to September 2025.</p>
+  <p><strong>Out:</strong> any write-back to the CRM · replacing CRM capture or QR attendance · authoring or
+  hosting the survey · access beyond L&amp;D and the row-level security it needs · cost and ROI (no data) ·
+  plan-versus-actual (no data) · skills and certification · <b>any Microsoft Forms or Graph integration</b>,
+  which the CRM payload makes unnecessary.</p>
+  <p><strong>Users:</strong> L&amp;D Specialist (daily), Manager (weekly), Director (monthly). One
+  permission set in v1; leadership receives exported files, not logins.</p>
+
+  <div class="note">
+    <p class="t">What the live connection proved — 2 September</p>
+    <p>The CRM exposes a single read-only endpoint,
+    <code>GET /api/learning-integration/programs</code>, returning each program with its sessions,
+    attendance, roster, survey answers and assessment answers nested inside. Authentication is a static
+    service key in an <code>X-Learning-Key</code> header. We connected, pulled the whole dataset and landed
+    it. <strong>All 57 programs validate against the typed models with zero rejections.</strong></p>
+    <p><strong>Measured, not estimated:</strong> 57 programs · 123 sessions · 1,048 roster entries ·
+    53 programs carrying a survey · 16 distinct trainer strings · 5 distinct companies among attendees ·
+    <b>0</b> sessions missing a time · <b>0</b> roster rows without a matching CRM user.</p>
+    <p><strong>The HRIS is not needed.</strong> The CRM user object already carried department, company and
+    position; on request the CRM team added <code>sector</code>, <code>job_level_name</code> and
+    <code>job_level_grade</code>. Both coverage dimensions in FR-D07 are now answerable from one source —
+    23 sectors and 17 job grades, from CEO down to Clerk. It also exposes no national ID and no payscale
+    field, so the PII allowlist has nothing to reject.</p>
+    <p><strong>Identity is settled.</strong> Across 2,218 user objects the payload carries
+    <b>417 people, 417 employee codes and 417 odoo ids</b> — a perfect 1:1, none missing, no code
+    carrying two names. FR-B04's four-step resolution collapses to a single join, and P-07 closes: the
+    workbook's 38 unjoinable rows were an artefact of its export, not a property of the source. The one
+    exception is the trainer, who is the only person in the payload represented by a typed name rather
+    than a key.</p>
+    <p><strong>P-05 has reappeared, in <code>sector</code>.</strong> 940 of 1,052 user objects carry a
+    trailing space: 28 distinct raw values collapse to <b>23</b> once trimmed, so grouping on the raw value
+    invents five sectors that do not exist. Exactly the defect that split <code>Projects</code> from
+    <code>Projects&nbsp;</code> in the workbook. Two smaller ones alongside it:
+    <code>job_level_grade</code> arrives as text, so <code>"10"</code> sorts before <code>"9"</code> and
+    seniority ordering breaks unless it is parsed to an integer; and job level is absent for
+    <b>74 people</b>, roughly one in ten, who therefore drop out of level breakdowns.</p>
+    <p><strong>The trap to know about.</strong> <code>status</code> and <code>computed_status</code> disagree
+    on <b>55 of 57</b> programs — every one of them stored as <code>upcoming</code> while actually
+    <code>completed</code>. Counting Total Programs off <code>status</code> yields <b>2</b>; the real answer
+    is <b>55</b>. Only <code>computed_status</code> is trustworthy.</p>
+    <p><strong>P-12 is closed.</strong> Sessions carry a stable <code>id</code>, so Training Days is a real
+    <code>COUNT(DISTINCT session_key)</code> and the workbook's <code>#</code> column is retired rather than
+    reconciled.</p>
+  </div>
+</section>
+
+<!-- ============ ARCH ============ -->
+<section id="arch">
+  <h2><span class="num">02</span>Architecture</h2>
+  <p class="lede">57 programs, 123 sessions, 1,048 roster entries, ~2,000 new rows a year. One PostgreSQL
+  instance carries this for a decade. A complete CRM pull is six requests against a 120/min limit, which is
+  why "incremental" and "full" are the same fetch here.</p>
+
+<pre><code>CRM REST  ─┐   one endpoint, everything nested
+LinkedIn  ─┴─► <span class="kw">ingest</span>   ─► raw.*   append-only jsonb + payload_hash; never mutated
+                                 │
+                                 ▼   ◄── enrichment overlay (never an edit)
+              <span class="kw">transform</span> ─► core.*  star schema; pure function of (raw + enrichment)
+                                 │        idempotent upsert on natural key
+                                 ▼
+              <span class="kw">metrics</span>   ─► one registry, one definition per KPI
+                                 │        shared by API, exports and tests
+                                 ▼
+              <span class="kw">serve</span>     ─► FastAPI /v1/ ─► React SPA
+                                       └► Celery ─► XLSX/PDF ─► email
+</code></pre>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Layer</th><th>Choice</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>API</td><td>Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic</td><td>Pydantic validates at the CRM boundary, where bad source data must be caught</td></tr>
+        <tr><td>Database</td><td>PostgreSQL 16 · schemas <code>raw core app ops</code></td><td>Schema separation makes raw-immutability enforceable with grants</td></tr>
+        <tr><td>Jobs</td><td>Celery 5 + Beat, Redis broker</td><td>30-minute schedule, on-demand trigger and backoff all built in</td></tr>
+        <tr><td>Cache</td><td>Redis 7</td><td>Sessions plus short-TTL aggregate cache, invalidated on transform. This is how the 2s p95 is met</td></tr>
+        <tr><td>Front end</td><td>React 18, TS, Vite, TanStack Query + Table, Recharts</td><td>Drill-through is first-class: every KPI resolves to a virtualised record grid</td></tr>
+        <tr><td>Auth</td><td>OIDC via Authlib, signed session cookie</td><td>No local passwords; claims carried so scoping is additive later</td></tr>
+        <tr><td>CRM</td><td>httpx over one read-only endpoint, static <code>X-Learning-Key</code></td><td>Programs, sessions, attendance, roster, survey and assessment answers arrive as one tree per program. No <code>updated_at</code> filter exists, so change detection is by payload hash</td></tr>
+        <tr><td>LinkedIn</td><td>Scheduled export file ingest</td><td>Per learner per course with time spent (Q-08). Feeds LinkedIn Hours, Blended Learner Hours and Unique Reach</td></tr>
+        <tr><td>Exports</td><td>openpyxl, WeasyPrint</td><td>openpyxl reproduces the current dashboard layout cell for cell</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>Deliberately not used:</strong> dbt or any warehouse tooling · a columnar store · a message
+  bus · Kubernetes · a component library · GraphQL. The largest projected table is 15,000 rows; complexity
+  here buys nothing and costs maintenance forever.</p>
+</section>
+
+<!-- ============ INFRA ============ -->
+<section id="infra">
+  <h2><span class="num">03</span>Infrastructure and containers</h2>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Environment</th><th>Host</th><th>Data</th></tr></thead>
+      <tbody>
+        <tr><td><code>dev</code></td><td>Local Docker Compose</td><td>Anonymised fixtures, no real PII</td></tr>
+        <tr><td><code>staging</code></td><td>VM · 2 vCPU / 4 GB</td><td>CRM sandbox, or live CRM with a read-only key</td></tr>
+        <tr><td><code>production</code></td><td>VM · 4 vCPU / 8 GB / 100 GB</td><td>Live, read-only source credentials</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Seven services, one Compose file per environment</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Service</th><th>Image</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>proxy</code></td><td><code>nginx:1.27-alpine</code></td><td>TLS, serves the SPA, proxies <code>/v1/</code> — the only published port, 443</td></tr>
+        <tr><td><code>web</code></td><td>Built: Node → Nginx</td><td>The compiled React bundle</td></tr>
+        <tr><td><code>api</code></td><td>Built: <code>python:3.12-slim</code></td><td>FastAPI under Gunicorn, non-root user, healthcheck</td></tr>
+        <tr><td><code>worker</code></td><td>Same image as <code>api</code></td><td>Celery: sync, transform, exports, email</td></tr>
+        <tr><td><code>beat</code></td><td>Same image as <code>api</code></td><td>Schedules: 30-min incremental, nightly full, monthly report</td></tr>
+        <tr><td><code>db</code></td><td><code>postgres:16-alpine</code></td><td>Internal network only, no host port</td></tr>
+        <tr><td><code>redis</code></td><td><code>redis:7-alpine</code></td><td>Internal network only, no host port</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><code>api</code>, <code>worker</code> and <code>beat</code> run <strong>the same image</strong> with
+  different commands, so a metric computed in a background report is computed by identical code to the one
+  on screen.</p>
+
+  <h3>Deploy and rollback</h3>
+  <ol>
+    <li>CI builds both images, tags with the commit SHA, pushes to the registry.</li>
+    <li><strong>Migrations run as a one-shot container first</strong> — <code>compose run --rm api alembic upgrade head</code>. If it fails, the deploy stops and the running version is untouched.</li>
+    <li><code>compose up -d</code> recreates changed services; <code>db</code> and <code>redis</code> are not recreated. Health polled, then previous images pruned.</li>
+    <li><strong>Images are built once and promoted</strong> — what was tested on staging is bit-identical to production. Rollback re-deploys the previous SHA; migrations stay backward-compatible for one release so no database downgrade is ever needed.</li>
+  </ol>
+
+  <h3>Network, secrets, backup</h3>
+  <ul>
+    <li>Only 443 published. Egress allowlisted to the CRM, the LinkedIn export host, the IdP and SMTP. Corporate network or VPN only.</li>
+    <li>Every credential from the company secret store as an environment variable at deploy. None in source, images or Compose files. Secret scanning on every push.</li>
+    <li>Nightly <code>pg_dump -Fc</code> plus WAL archiving, 30-day retention. <strong>Restore rehearsed for real in week 10</strong> — configured is not proven.</li>
+  </ul>
+</section>
+
+<!-- ============ MODEL ============ -->
+<section id="model">
+  <h2><span class="num">04</span>Data model</h2>
+  <p class="lede">The workbook's core fault is one flat table carrying three grains. Separating them is the
+  foundation.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Table</th><th>Key / grain</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td><code>dim_employee</code></td><td><code>employee_code</code>, SCD Type 2</td><td>Headcount as of the period, not today. <code>is_estimated</code> flags backfilled periods with no real history</td></tr>
+        <tr><td><code>dim_program</code></td><td><code>crm_program_id</code></td><td>Never keyed on title — the fix for P-02</td></tr>
+        <tr><td><code>dim_session</code></td><td><code>crm_session_id</code></td><td><code>duration_hours</code> derived from times; <code>duration_derivable</code> flag</td></tr>
+        <tr><td><code>dim_trainer</code></td><td>CRM trainer id, once the CRM supplies one</td><td>Keyed on an id, not a name — the fix for P-04. Free-text spellings resolve to that key; a local alias map is only the fallback if the CRM cannot add the reference</td></tr>
+        <tr><td><code>dim_date</code></td><td><code>date</code></td><td>Month, quarter, fiscal attributes</td></tr>
+        <tr><td><code>fact_enrollment</code></td><td>employee × program</td><td>Grain confirmed by Q-04 in week 1</td></tr>
+        <tr><td><code>fact_attendance</code></td><td>employee × session</td><td><code>UNIQUE(employee_key, session_key)</code> catches duplicate scans &mdash; <code>session_key</code> must be the CRM session ID, never the workbook <code>#</code> (P-12)</td></tr>
+        <tr><td><code>fact_evaluation</code></td><td>response × program</td><td><code>nps_band</code> derived once here, never recomputed</td></tr>
+        <tr><td><code>enrichment_override</code></td><td>program × field</td><td>Overlay, never an edit. Superseded rather than updated, so history survives</td></tr>
+        <tr><td><code>identity_resolution</code> · <code>sync_run</code> · <code>dq_exception</code></td><td>—</td><td>Matching decisions, sync audit, open data-quality issues</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <p class="t">Two hour metrics, one name</p>
+    <p><code>Program Duration/hrs</code> = 130.5 is <strong>catalogue hours</strong>: how much distinct
+    training was built. <code>Learning Hrs</code> = 1,386 is <strong>learner-hours</strong>: hours times
+    the people who received them. Both correct, for different questions. Named <strong>Training Hours
+    Delivered</strong> and <strong>Learner Hours</strong> so they are never conflated again.</p>
+  </div>
+
+  <h3>Sync</h3>
+  <ul>
+    <li><strong>Incremental every 30 min</strong> on <code>updated_at</code>, watermark per entity, 5-minute overlap for clock skew.</li>
+    <li><strong>Full reconcile nightly</strong> — soft-deletes what vanished, reprocesses changed hashes. Catches what incremental cannot see.</li>
+    <li><strong>Idempotent by construction.</strong> Transform is a pure function of raw plus enrichment, upserted on natural key. Re-running any window is a no-op.</li>
+    <li><strong>Last known good.</strong> A failed pull never triggers a transform; the dashboard keeps serving and the freshness banner shows the lag.</li>
+  </ul>
+</section>
+
+<!-- ============ METRICS ============ -->
+<section id="metrics">
+  <h2><span class="num">05</span>The metric layer</h2>
+  <p class="lede">Nine KPIs currently live inside nine unauditable <code>GETPIVOTDATA</code> strings. Six of them
+  are wrong &mdash; participation rate twice over (P-01, P-13), and NPS plus three quality scores through one
+  hidden filter (P-03). One definition, declared once, consumed identically by API, exports and tests.</p>
+
+  <div class="note">
+    <p class="t">The type system prevents P-03 recurring</p>
+    <p><strong>Correction to the premise.</strong> NPS was not wrong because a ratio was averaged. In the
+    workbook every row scores exactly +1, 0 or −1, so averaging them already equals
+    (promoters − detractors) / n. The published figure was wrong because it was computed over a
+    <strong>silently filtered 55 of 77 responses</strong>.</p>
+    <p><code>RatioMetric</code> is still worth building — it keeps group-level aggregation correct once
+    responses per group differ, which they will. But the defence that actually prevents P-03 recurring is
+    <strong>explicit scope</strong>: every metric declares its population, any filter is a named parameter
+    rather than an inherited one, and the response count is returned beside every quality score so a
+    shrinking denominator is visible. Each metric also carries its definition string, served to the UI and
+    stamped on every export — the number, its definition and its population ship together.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Metric</th><th>Definition</th><th>vs workbook</th></tr></thead>
+      <tbody>
+        <tr><td>Total Participants</td><td><code>COUNT(DISTINCT employee_key)</code></td><td><span class="chip lo">Same</span></td></tr>
+        <tr><td>Learner Hours</td><td><code>SUM(learning_hours)</code></td><td><span class="chip lo">Same</span></td></tr>
+        <tr><td>Facilitator Performance</td><td><code>COUNT(q4 ≥ 4) / COUNT(responses)</code></td><td><span class="chip lo">Same</span> <span style="color:var(--ink-3)">100.0% either way</span></td></tr>
+        <tr><td>Knowledge · Activity · Logistics</td><td><code>COUNT(q ≥ 4) / COUNT(responses)</code></td><td><span class="chip hi">Corrected P-03</span> <span style="color:var(--ink-3)">scope, not formula</span></td></tr>
+        <tr><td>Training Days</td><td><code>COUNT(DISTINCT session_key)</code></td><td><span class="chip med">Restated</span></td></tr>
+        <tr><td>Training Hours Delivered</td><td><code>SUM(session.duration_hours)</code></td><td><span class="chip med">Restated</span></td></tr>
+        <tr><td>Total Programs</td><td><code>COUNT(DISTINCT program_key)</code> where Completed</td><td><span class="chip med">Restated</span></td></tr>
+        <tr><td>L&amp;D-delivered % <span style="color:var(--ink-3)">(was Internal %)</span></td><td>type = Internal means <b>delivered by L&amp;D</b>; External means any other department or an outside vendor</td><td><span class="chip med">Renamed</span> <span style="color:var(--ink-3)">same formula</span></td></tr>
+        <tr><td>Public vs Customised</td><td>L&amp;D-maintained enrichment &mdash; CRM Target does not express it</td><td><span class="chip med">Restated</span></td></tr>
+        <tr><td>LinkedIn Hours · Blended Learner Hours · Unique Reach</td><td>From the LinkedIn export, blended with classroom activity</td><td><span class="chip new">New</span></td></tr>
+        <tr><td>Participation Rate</td><td>participants / active employees in the <b>CRM-enrollable population</b> as of period end</td><td><span class="chip hi">Corrected P-01 · P-13</span> <span style="color:var(--ink-3)">denominator and population both</span></td></tr>
+        <tr><td>NPS</td><td><code>(promoters − detractors) / responses</code>, over the full population</td><td><span class="chip hi">Corrected P-03</span> <span style="color:var(--ink-3)">scope, not formula</span></td></tr>
+        <tr><td>No-show Rate</td><td>(enrolled − attended) / enrolled</td><td><span class="chip new">New</span></td></tr>
+        <tr><td>Fill Rate</td><td>enrollments / capacity</td><td><span class="chip new">New</span></td></tr>
+        <tr><td>Survey Response Rate</td><td>evaluations / distinct attendees — currently 19%</td><td><span class="chip new">New</span></td></tr>
+        <tr><td>Coverage Gap · Months Since Last Training</td><td>Employees with zero attendance; latest attendance per person. Breakdowns by sector, department, company and job level all come from the CRM user object</td><td><span class="chip new">New</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<section id="app">
+  <h2><span class="num">06</span>API and screens</h2>
+  <p class="lede">A fixed set of endpoints under <code>/v1/</code>. Every read endpoint takes the same
+  filters — date range, sector, department, type, target, trainer, program — and every response carries
+  freshness, applied filters and <code>excluded_count</code>.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Route</th><th>Endpoint</th><th>Screen contents</th></tr></thead>
+      <tbody>
+        <tr><td><code>/</code></td><td><code>/v1/kpis</code> · <code>/{key}/trend</code> · <code>/breakdown</code></td><td>Twelve KPI cards with definition tooltips, monthly trends, the two splits</td></tr>
+        <tr><td><code>/programs/:id</code></td><td><code>/v1/programs/{id}/scorecard</code></td><td>Sessions, capacity, enrollments, fill rate, no-show, hours, NPS, quality, all comments</td></tr>
+        <tr><td><code>/trainers/:id</code></td><td><code>/v1/trainers/{id}/scorecard</code></td><td>Programs and sessions delivered, learners reached, weighted NPS, trend</td></tr>
+        <tr><td><code>/coverage</code></td><td><code>/v1/coverage</code></td><td>Participation by sector, department, job level; zero-training list; months since last</td></tr>
+        <tr><td><code>/funnel</code></td><td><code>/v1/funnel</code></td><td>Enrolled → attended → evaluated, with no-show and response rates</td></tr>
+        <tr><td><code>/learners/:id</code> · <code>/top-learners</code></td><td><code>/v1/learners</code> · <code>/top-learners</code></td><td>Individual profile; automatic ranking by learning hours</td></tr>
+        <tr><td><code>/enrichment</code></td><td><code>/v1/enrichment</code></td><td>Programs missing a department or trainer, with audit history</td></tr>
+        <tr><td><code>/exceptions</code></td><td><code>/v1/exceptions</code> · <code>/completeness</code></td><td>Open issues by type and age, suggested resolutions, resolve actions</td></tr>
+        <tr><td><code>/exports</code></td><td><code>/v1/exports</code></td><td>Generate now; retrieve prior editions</td></tr>
+        <tr><td>global</td><td><code>/v1/drill/{key}</code> · <code>/freshness</code></td><td>Drill drawer from any number; freshness badge; exclusion banner</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>Cross-cutting:</strong> one filter model synced to the URL so any view is shareable as a
+  link · drill from any KPI or chart element to the exact records · freshness badge everywhere, amber past
+  60 minutes lag · a banner stating how many records are excluded where exceptions affect a view · WCAG
+  2.1 AA, axe-core in CI.</p>
+
+  <h3>Reports</h3>
+  <p>Monthly L&amp;D Report (XLSX + PDF, scheduled) · Coverage Report (XLSX, quarterly) · Program and
+  Trainer Scorecards (PDF, on demand) · Attendance Extract (CSV/XLSX) · Exception Report (XLSX, weekly).
+  The monthly report mirrors the current dashboard's layout so recipients need no retraining — the change
+  is that nobody assembles it. Every export computes from the metric registry and is stamped with
+  generation time, filters, freshness and excluded count.</p>
+</section>
+
+<!-- ============ WEEKS ============ -->
+<section id="weeks">
+  <h2><span class="num">07</span>The ten weeks</h2>
+  <p class="lede"><span class="chip lo">Done</span> built and verified &middot;
+  <span class="chip med">Open</span> ours, not started &middot;
+  <span class="chip ask">L&amp;D</span> waiting on someone else &middot;
+  <span class="chip drop">Dropped</span> no longer needed &middot;
+  <span class="chip hi">Q-15</span> the one blocking question.</p>
+  <p class="lede">Six phases as the BRD sets them out. <strong style="color:var(--a)">Person A</strong>
+  owns data and pipeline — if a number is wrong, it is their work.
+  <strong style="color:var(--b)">Person B</strong> owns infrastructure, API and application — if something
+  is hard to use, it is theirs. Each reviews the other.</p>
+
+  <div class="phase"><span class="r">Foundation and integration</span><span class="w">Weeks 1&ndash;2</span></div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 1</span><span class="ti">Questions, environments, first connection</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li><span class="chip lo">Done</span> <b>Q-01 to Q-05 and Q-12 answered</b>, now confirmed against the live API. Trainer arrives on each <i>session</i> as free text and may be null; enrollment is per program and attendance per session; sessions carry a stable id. <b>Q-05 is moot</b> — there is no HRIS integration.</li>
+        <li><span class="chip lo">Done</span> <b>Q-03 answered the other way: feedback IS in the CRM</b> <i>(so Q-14 and the Graph app registration are not needed at all)</i>. <code>survey</code>, <code>survey_answers[]</code> and <code>assessment_answers[]</code> arrive nested inside each program. <s>Q-14, the Microsoft Graph app registration</s> — <b>closed, and no longer needed</b>. The critical-path dependency is gone.</li>
+        <li><span class="chip lo">Done</span> <b>Q-02 answered:</b> the CRM does record which department a customised program was built for — <code>departments[]</code> is populated whenever <code>target</code> is <code>department</code> (7 of 57 programs today).</li>
+        <li><span class="chip lo">Done</span> <b>Q-08 to Q-11 and Q-13 answered</b> &mdash; BRD §16.1. LinkedIn export is per learner per course; CRM history runs from September 2025; NPS keeps a labelled legacy comparison; customised department stays enrichment.</li>
+        <li><span class="chip ask">L&amp;D</span> Confirm the <b>LinkedIn export</b> delivery mechanism and column set.</li>
+        <li><span class="chip hi">Q-15</span> <b>The CRM needs an employees endpoint</b> <i>(measured: the payload gives a complete numerator — 417 people, each with their company — but no denominator, because someone who never attended is not in it at all. L&amp;D's headcount sheet cannot substitute: it holds 212 employees of <b>one</b> company, and <b>272 of the 417 who have trained are not in it</b>. Minimum viable ask is five numbers, one active-employee count per company)</i> — originally &mdash; that population <i>is</i> the participation-rate denominator (Q-15, assumption A-1). No HR roster and no HR involvement; if enumeration is not possible, fall back to a labelled single-entity ratio rather than a mixed one.</li>
+        <li><span class="chip lo">Done</span> Authenticated against the CRM; contract-fixture record and replay in place.</li>
+        <li><span class="chip lo">Done</span> CRM client and typed models for the whole program tree. All 57 live programs parse with zero rejections.</li>
+        <li><span class="chip lo">Done</span> The <b>raw landing layer</b>: stored unmodified, payload hash, dedup — idempotency and replay asserted against a real PostgreSQL.</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li><span class="chip lo">Done</span> Three environments; both <b>Dockerfiles</b> and four <b>Compose files</b>. Only <code>proxy</code> publishes a port, asserted in CI.</li>
+        <li><span class="chip lo">Done</span> Repo skeleton, Alembic baseline, the four schemas. <b>Raw immutability is a grant, not a convention</b> — the application role has SELECT and INSERT on <code>raw</code> and no UPDATE or DELETE, verified against a live database.</li>
+        <li><span class="chip lo">Done</span> CI: secret scan, lint, type-check, migrations against a real Postgres, tests, image build, vulnerability scan, smoke test, deploy to staging.</li>
+        <li><span class="chip lo">Done</span> FastAPI, <code>/v1/health</code>, <b>OIDC login with PKCE</b>; secrets wired. The dev bypass is refused at startup outside dev.</li>
+      </ul></div>
+    </div>
+    <div class="check"><b>End of week</b> <b>Met.</b> All 57 CRM programs are in the raw layer behind a working login. Outstanding: confirm the CRM can enumerate its enrollable population (Q-15), which is the only open question left.</div>
+  </div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 2</span><span class="ti">All sources, on a schedule</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li><span class="chip lo">Done</span> CRM clients for enrollments and attendance (feedback is not there). <i>(feedback is the survey and it is in the CRM — enrollments, attendance and survey answers all arrive nested in the program tree, so no separate client was needed for any of the three)</i></li>
+        <li><span class="chip lo">Done</span> Microsoft Graph client for Forms responses, plus the matching layer: free-text topic → CRM program, respondent → employee, trainer string → CRM trainer. <i>(no Graph client built: the CRM returns <code>survey</code> and <code>survey_answers[]</code> per program, 53 of 57 carrying one. Answers arrive already attached to their program and respondent, so the matching layer is unnecessary)</i></li>
+        <li><span class="chip lo">Done</span> HRIS client with the PII allowlist enforced at the boundary. <i>(no HRIS integration: the CRM user object carries department, company and position, and the CRM team added sector, job_level_name and job_level_grade on request. The allowlist is satisfied at source — the CRM exposes no national ID and no payscale field)</i></li>
+        <li><span class="chip lo">Done</span> Prove full replay from raw with no source calls, and idempotency on repeat runs. <i>(verified on live data: 57 programs received and landed, then 0 landed and 57 unchanged on an immediate re-run)</i></li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li><span class="chip lo">Done</span> <code>worker</code> and <code>beat</code> containers; 30-minute incremental with watermarks. <i>(runs against the live CRM: 57 fetched and landed, then 57 fetched and 0 landed on an immediate re-run. Watermarks cannot narrow the query — the CRM exposes no <code>updated_at</code> filter — so every pass fetches all 57 in six requests and change detection is by payload hash, which also catches silent edits a watermark would miss)</i></li>
+        <li><span class="chip lo">Done</span> Nightly full reconcile detecting deletions and silent edits. <i>(<code>ops.source_presence</code> records what each pass saw; anything present before and absent from a complete pull is marked vanished and counted into <code>records_deleted</code>, which the alert rule reads. Only a full pass may conclude a record has gone — an incremental sees a subset by construction. Nothing is erased: a vanished record keeps every raw version it ever had)</i></li>
+        <li><span class="chip lo">Done</span> Backoff, circuit breaker, degrade to last-known-good. Exponential backoff with jitter, a breaker with a failure threshold and cooldown, both tested.</li>
+        <li><span class="chip lo">Done</span> <code>sync_run</code> audit, JSON logging, alerting, <code>/v1/freshness</code> — with an alert rule set, a notifier and an abandoned-run reaper beyond what was asked.</li>
+      </ul></div>
+    </div>
+    <div class="check gate"><b>Phase exit — met</b> Both sources sync on schedule and raw is replayable, verified against the live CRM: 57 programs fetched and landed, then 57 fetched and 0 landed on an immediate re-run; the nightly reconcile records 57 present and 0 vanished. Failure handling verified by pointing at an unconfigured CRM — the run is recorded failed, <code>/v1/freshness</code> shows the lag, and the platform keeps serving. <b>345 tests, 92% coverage.</b> Only the LinkedIn export remains, scheduled for weeks 7–8.</div>
+  </div>
+
+  <div class="phase"><span class="r">Model, metrics and reconciliation</span><span class="w">Weeks 3&ndash;4</span></div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 3</span><span class="ti">Star schema and identity</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li><code>dim_program</code> <b>keyed on CRM ID</b>, <code>dim_session</code> with derived duration, <code>dim_trainer</code> keyed on the CRM trainer reference.</li>
+        <li><b>Identity resolution</b>: a join on <code>employee_code</code>, and nothing more. Verified 1:1 across 2,218 user objects with none missing, so the email, name and fuzzy-suggestion stages are not built. No external-attendee category — everyone is a group employee.</li>
+        <li><b>Quarantine</b> the unresolvable — excluded from metrics, never dropped.</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li><code>dim_employee</code> as <b>SCD2</b> plus <code>headcount_as_of(entity_set)</code>; <code>dim_date</code>. Built from the CRM user object — department, company, position, sector and job level — so snapshots start now and pre-launch periods are flagged <code>is_estimated</code>. Conform <code>sector</code> on the way in: it carries trailing whitespace on 940 of 1,052 rows (P-05). <b>Roster must span every entity the CRM enrolls from</b> (P-13).</li>
+        <li>The <b>three fact tables at three grains</b>, with the duplicate-scan constraint.</li>
+        <li><b>Normalise categoricals on ingest</b>; unknowns to the queue.</li>
+        <li>Assert every run: <b>counted + quarantined = received</b>.</li>
+      </ul></div>
+    </div>
+    <div class="check"><b>End of week</b> No record passes through without being either counted or quarantined.</div>
+  </div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 4</span><span class="ti">Metric layer and reconciliation</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li>The <b>metric registry</b> and the <code>RatioMetric</code> type.</li>
+        <li>All <b>twenty-one metrics</b>: three unchanged, five restated/renamed, six corrected, seven new.</li>
+        <li>The <b>drill-through query</b> behind each metric.</li>
+        <li>Every metric declares its <b>population</b>; no filter is ever inherited (FR-A05c).</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li><b>Load history from the CRM</b>, which holds sessions from September 2025 (Q-10, Q-12). Confirmed: 123 sessions across 57 programs, none missing a time. The workbook is a fallback only, source-tagged if used.</li>
+        <li>The <b>frozen reference dataset</b> and golden-value suite at every grain.</li>
+        <li>CI gate: <b>a change that moves a published figure fails the build</b>.</li>
+        <li>Produce the <b>reconciliation statement</b>.</li>
+      </ul></div>
+    </div>
+    <div class="check gate"><b>Phase exit — stakeholder gate</b> Every KPI computes correctly and each difference is accepted. Walk L&amp;D through every restated figure now &mdash; NPS 92.7% → 84.4%, the quality scores, and participation rate recomputed on the CRM-enrollable population. Never present the old 60.4%: it divided 128 mixed-entity attendees by 212 single-entity employees (P-13).</div>
+  </div>
+
+  <div class="phase"><span class="r">Core dashboard</span><span class="w">Weeks 5&ndash;6</span></div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 5</span><span class="ti">API and dashboard shell</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li><code>/v1/kpis</code>, <code>/breakdown</code>, <code>/trend</code>, <code>/dimensions</code>.</li>
+        <li>Aggregate caching keyed by filter hash, <b>invalidated on transform</b>.</li>
+        <li>Indexes from the dashboard's real queries, targeting the 2s p95.</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li>React shell, routing, authenticated session.</li>
+        <li>The <b>KPI summary</b> with definition tooltips.</li>
+        <li>The <b>global filter bar</b>, URL-synced, identical across views.</li>
+        <li>The <b>freshness badge</b> on every screen.</li>
+      </ul></div>
+    </div>
+    <div class="check"><b>End of week</b> A working dashboard on staging with the corrected numbers, filterable.</div>
+  </div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 6</span><span class="ti">Drill-through and enrichment</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li><b>Enrichment override</b> tables and API, applied during transform — never mutating synced data.</li>
+        <li>Audit trail: who changed what, when, prior values retained.</li>
+        <li><code>/v1/drill/{key}</code>, row count always matching its KPI.</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li>The <b>drill drawer and record grid</b>: virtualised, sortable, exportable in place.</li>
+        <li><b>Monthly trend charts</b> for every KPI.</li>
+        <li>The <b>exclusion banner</b> stating how many records are excluded.</li>
+        <li>The <b>enrichment admin screen</b>. <span class="chip should">Should</span> bulk assign.</li>
+      </ul></div>
+    </div>
+    <div class="check gate"><b>Phase exit</b> An L&amp;D specialist reproduces their current dashboard unaided, and drills from any number to the records behind it.</div>
+  </div>
+
+  <div class="phase"><span class="r">Analysis views and export</span><span class="w">Weeks 7&ndash;8</span></div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 7</span><span class="ti">Scorecards, coverage, funnel</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li>Scorecard aggregations with <b>no-show, fill rate, response rate</b>.</li>
+        <li>Coverage queries by sector, department, job level; zero-training list; months since last.</li>
+        <li>The funnel query: <b>enrolled → attended → evaluated</b>.</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li><b>Program scorecard</b> including all free-text comments.</li>
+        <li><b>Trainer scorecard</b> with weighted NPS and trend.</li>
+        <li><b>Coverage view</b> and <b>funnel view</b>.</li>
+      </ul></div>
+    </div>
+    <div class="check"><b>End of week</b> The analyses Excel could never produce are live.</div>
+  </div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 8</span><span class="ti">Learner views and export</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li>Learner profile data and the automatic <b>top-learners ranking</b>.</li>
+        <li><b>LinkedIn ingest and matching</b>; LinkedIn Hours, Blended Learner Hours and Unique Reach. <span class="chip should">Cut first</span> if the schedule tightens &mdash; classroom metrics do not depend on it.</li>
+        <li>The <b>export service</b>, computing from the metric registry — never a parallel implementation.</li>
+        <li><b>Provenance stamping</b>: generated at, filters, freshness, excluded count.</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li><b>Learner profile</b> and <b>top learners</b> views.</li>
+        <li>Export any view to <b>CSV or XLSX</b>, honouring active filters.</li>
+        <li>The <b>formatted monthly XLSX</b> reproducing the current layout.</li>
+        <li><span class="chip should">Should</span> PDF pack · retention · saved views.</li>
+      </ul></div>
+    </div>
+    <div class="check gate"><b>Phase exit</b> Every analysis is live and exportable; the generated report sits side by side with the workbook's dashboard tab.</div>
+  </div>
+
+  <div class="phase"><span class="r">Data quality and automation</span><span class="w">Week 9</span></div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 9</span><span class="ti">Exception queue and automation</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li>All <b>eleven detection rules</b>, run after every transform.</li>
+        <li><code>dq_exception</code> storage; the <b>completeness indicator</b> per period.</li>
+        <li>Confirm <b>no record is excluded without an exception registered</b>.</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li>The <b>exception console</b> with suggested resolutions.</li>
+        <li>Resolve by <b>mapping, override, or dismissal with a reason</b>.</li>
+        <li><b>Scheduled generation and email delivery</b>, no human step.</li>
+        <li>Monitoring, alerting, runbooks rehearsed.</li>
+      </ul></div>
+    </div>
+    <div class="check gate"><b>Phase exit</b> The monthly report sends with no human step, and nothing is excluded without appearing in the queue.</div>
+  </div>
+
+  <div class="phase"><span class="r">Parallel run and handover</span><span class="w">Week 10</span></div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 10</span><span class="ti">Parallel run, sign-off, retirement</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li>Run alongside the workbook for a full cycle; <b>compare line by line</b>, every difference given a written cause.</li>
+        <li><b>Performance validation</b> at p95 against ~15,000 records.</li>
+        <li>Security review and <b>PII sign-off with HR</b>; <b>restore rehearsed for real</b>.</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li>Compare the generated report against the manual one, figure for figure.</li>
+        <li><b>UAT with all three L&amp;D roles</b>; accessibility pass; fixes.</li>
+        <li>Training and the user guide.</li>
+        <li>Move distribution to the platform and <b>freeze the workbook read-only</b>.</li>
+      </ul></div>
+    </div>
+    <div class="check gate"><b>Launch gate</b> Sign-off and workbook retirement. Full parallel run completed with all differences explained.</div>
+  </div>
+</section>
+
+<!-- ============ QUALITY ============ -->
+<section id="quality">
+  <h2><span class="num">08</span>Quality, security, operations</h2>
+
+  <h3>The invariant that makes silent loss impossible</h3>
+  <p>Every transform run asserts <code>count(raw active) = count(core included) + count(quarantined)</code>
+  before it commits. Off by one and the run fails loudly, with the dashboard still serving the previous
+  good state. That turns a policy into a property.</p>
+
+  <h3>Eleven detection rules</h3>
+  <p><code>IDENTITY_UNRESOLVED</code> (0 today — the code join is 1:1) · <code>TRAINER_MISSING</code> ·
+  <code>CUSTOMISED_DEPT_MISSING</code> · <code>DURATION_UNDERIVABLE</code> ·
+  <code>ATTENDANCE_NO_ENROLLMENT</code> · <code>EVALUATION_NO_ATTENDANCE</code> ·
+  <code>DUPLICATE_ATTENDANCE</code> · <code>CAPACITY_EXCEEDED</code> ·
+  <code>PROGRAM_TYPE_MISMATCH</code> (advisory) · <code>LINKEDIN_LEARNER_UNMATCHED</code> ·
+  <code>ATTENDEE_OUTSIDE_ROSTER</code>. Eleven, not thirteen: <s>EVAL_PROGRAM_UNMATCHED</s> and
+  <s>EVAL_TRAINER_UNMATCHED</s> existed only to catch free-text Forms responses failing to match a CRM
+  program or trainer. Answers now arrive already attached to their program and respondent, so neither
+  failure mode exists.</p>
+  <p><strong>Measured against live CRM data, before any transform:</strong>
+  <code>TRAINER_MISSING</code> would raise <b>2</b> (sessions with no trainer name);
+  <code>DURATION_UNDERIVABLE</code> would raise <b>0</b>; <code>IDENTITY_UNRESOLVED</code> would raise
+  <b>0</b> — every roster row resolves to a CRM user. The workbook's 38 unjoinable rows were a workbook
+  artefact, not a source defect. Each record is still counted or excepted, never neither.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Test layer</th><th>Gate</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Metric regression</strong> — all 21 metrics against a frozen reference dataset, at every grain</td><td>A change moving a published figure fails CI until the golden file is updated in the same PR with a named reviewer</td></tr>
+        <tr><td><strong>Contract</strong> — CRM and LinkedIn responses replayed from recorded fixtures</td><td>Blocking. A source schema change breaks the build, not the dashboard</td></tr>
+        <tr><td><strong>Transform integration</strong> — the invariant, SCD2 transitions, resolution order, idempotency</td><td>Blocking</td></tr>
+        <tr><td><strong>Unit</strong> — conformance, dates, NPS banding, duration, export formatting</td><td>80% on <code>transform</code> and <code>metrics</code></td></tr>
+        <tr><td><strong>API + E2E</strong> — auth, filter propagation, drill consistency; Playwright journeys</td><td>Blocking / nightly on staging</td></tr>
+        <tr><td><strong>Performance</strong> — seeded 15,000 rows, p95 under 2s</td><td>Weekly, and a launch gate</td></tr>
+        <tr><td><strong>Reconciliation</strong> — platform vs workbook, every difference attributed</td><td>Launch gate, human sign-off</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Security</h3>
+  <ul>
+    <li><strong>Field minimisation.</strong> Moot at source: the CRM exposes neither <code>identification_id</code> nor any payscale field, and there is no HRIS integration to leak them. The rejected-set test remains as a regression guard, and adding any field still requires naming the metric that needs it.</li>
+    <li><strong>SSO only</strong>, no local passwords. One L&amp;D role in v1, claims carried so row-level scoping is additive.</li>
+    <li><strong>Read-only at source</strong> — no CRM write client exists in the codebase, and credentials are issued read-only.</li>
+    <li><strong>Containers</strong> non-root, slim base, no build toolchain in the runtime layer, image scanning in CI.</li>
+    <li><strong>Audit</strong> — enrichment changes and exception resolutions attributed and retained.</li>
+  </ul>
+
+  <h3>Alerts and the monthly routine</h3>
+  <p>Alert on: any sync failure or two missed runs · freshness lag over 60 min · any transform invariant
+  failure (a correctness alarm, not a capacity one) · over 25 open exceptions or any older than 14 days ·
+  p95 over 2s sustained · report not delivered within 30 min of schedule.</p>
+  <p>After handover the cycle is: clear the queue (10 min), complete missing enrichment (10 min), check
+  completeness and freshness (5 min), and the report sends itself. <strong>25 minutes against 8&ndash;12
+  hours today.</strong></p>
+</section>
+
+<!-- ============ CUTOVER ============ -->
+<section id="cutover">
+  <h2><span class="num">09</span>Reconciliation and cutover</h2>
+  <p class="lede">The reconciliation is a launch gate, not a post-launch artefact. Its purpose is political
+  as much as technical: the corrected numbers look worse, and that must be discussed in week 4 rather than
+  discovered in week 10.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>KPI</th><th class="n">Workbook</th><th class="n">Platform</th><th>Cause</th></tr></thead>
+      <tbody>
+        <tr><td>Participation Rate</td><td class="n">66.7%</td><td class="n">recomputed</td><td>Two defects: hardcoded 192 <span class="id">P-01</span>, and a denominator covering one company while attendees span several <span class="id">P-13</span>. Recomputed on the CRM-enrollable population. <b>Do not quote 60.4%</b> &mdash; it divided 128 mixed-entity attendees by 212 single-entity employees</td></tr>
+        <tr><td>Total Programs</td><td class="n">24</td><td class="n">55 ↑</td><td>Completed programs, counted on <code>computed_status</code> — <code>status</code> disagrees on 55 of 57 and would yield 2. Title merges separated <span class="id">P-02</span>; unreported programs included <span class="id">P-08</span></td></tr>
+        <tr><td>Training Days</td><td class="n">40</td><td class="n">123 sessions in scope</td><td>Distinct CRM session ids, now confirmed to exist (Q-12). The final figure depends on the reporting window; the workbook <code>#</code> column is unusable for this <span class="id">P-12</span></td></tr>
+        <tr><td>Training Hours Delivered</td><td class="n">130.5</td><td class="n">TBC</td><td>Derived from session times; scope widened</td></tr>
+        <tr><td>Learner Hours</td><td class="n">1,386</td><td class="n">TBC</td><td>Same definition, wider scope; newly named</td></tr>
+        <tr><td>Total Participants</td><td class="n">128</td><td class="n">TBC ↑</td><td>Missing programs now included</td></tr>
+        <tr><td>NPS overall</td><td class="n">92.7%</td><td class="n">84.4%</td><td>Hidden <code>Completion Time</code> filter removed; all 77 responses counted <span class="id">P-03</span></td></tr>
+        <tr><td>Logistics Effectiveness</td><td class="n">96.4%</td><td class="n">92.2%</td><td>Same filter removed <span class="id">P-03</span></td></tr>
+        <tr><td>Knowledge Relevance</td><td class="n">100.0%</td><td class="n">97.4%</td><td>Same filter removed <span class="id">P-03</span></td></tr>
+        <tr><td>Activity Effectiveness</td><td class="n">98.2%</td><td class="n">97.4%</td><td>Same filter removed <span class="id">P-03</span></td></tr>
+        <tr><td>Facilitator Performance</td><td class="n">100.0%</td><td class="n">100.0%</td><td>Unchanged once the filter is removed <span class="id">P-03</span></td></tr>
+        <tr><td>Per-trainer NPS · Sector breakdowns</td><td class="n">varies</td><td class="n">shifts</td><td>Name variants merged <span class="id">P-04</span>; whitespace merged <span class="id">P-05</span>; 38 rows covering 12 people resolved or quarantined <span class="id">P-07</span></td></tr>
+        <tr><td>LinkedIn Hours · Blended Learner Hours · Unique Reach</td><td class="n">manual</td><td class="n">new</td><td>Replaces the hand-typed <code>Linked In no</code> sheet <span class="id">P-14</span></td></tr>
+        <tr><td>Survey Response Rate</td><td class="n">—</td><td class="n">19%</td><td>New. All quality scores should be read against it <span class="id">P-11</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note crit">
+    <p class="t">How to present it</p>
+    <p>Frame it as correcting a known defect, never as a decline. The training delivered in February did
+    not change; only the arithmetic describing it did. Bring the evidence — the hardcoded 192, the two Hard
+    Talks IDs, the two spellings of one trainer's name, and the pivot filter that drops the two largest
+    programs from every quality score — and let the file make the argument.</p>
+    <p>The quality scores need care: they fall because <strong>29% of the feedback was excluded</strong>,
+    not because satisfaction dropped. Say that first, then show the numbers.</p>
+  </div>
+
+  <p><strong>Cutover:</strong> week 9 the platform generates alongside the workbook but distributes
+  nothing · week 10 full parallel cycle, every difference attributed · Director signs the reconciliation ·
+  distribution switches to the platform · the workbook is frozen read-only and the SOP retired · it stays
+  restorable for one further cycle, and reverting means resuming manual assembly, so the trigger is a
+  correctness failure, not a preference.</p>
+</section>
+
+<!-- ============ RISK ============ -->
+<section id="risk">
+  <h2><span class="num">10</span>Team, risks, acceptance</h2>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Role</th><th>Allocation</th><th>Owns</th></tr></thead>
+      <tbody>
+        <tr><td>Person A — Data engineer</td><td>1.0 FTE</td><td>Integration, star schema, identity, metric layer, DQ rules</td></tr>
+        <tr><td>Person B — Application engineer</td><td>1.0 FTE</td><td>Infrastructure, containers, CI/CD, API, React app, exports, scheduling</td></tr>
+        <tr><td>L&amp;D Specialist</td><td>1 day / week</td><td>Product owner in practice: enrichment, exception triage, acceptance</td></tr>
+        <tr><td>L&amp;D Director</td><td>Gate reviews</td><td>Accepting every restated figure; the Q-06 and Q-10 decisions</td></tr>
+        <tr><td>CRM owner · Project team · IT</td><td>Week 1, then on call</td><td>CRM API access <span class="chip lo">granted</span> · sector and job level added <span class="chip lo">done</span> · VMs, TLS, SSO, backup · <b>the Q-15 answer</b>, now the only outstanding item</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <p class="t">The dependency most likely to be underestimated</p>
+    <p>The L&amp;D Specialist's one day a week is load-bearing. Enrichment, triage and acceptance all route
+    through that person; if their availability slips, weeks 6 and 9&ndash;10 stall regardless of
+    engineering progress. Name the individual at kick-off and protect the time.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Risk <span style="text-transform:none;letter-spacing:0;font-weight:400">(IDs match BRD §15.2)</span></th><th>Sev</th><th>Trigger and response</th></tr></thead>
+      <tbody>
+        <tr><td><span class="id">R-01</span> <s>No usable CRM API</s> — <b>closed</b></td><td><span class="chip lo">Closed</span></td><td>Confirmed 2 September: one read-only endpoint, key-authenticated, 120 req/min, whole dataset in six requests. Freshness of 30 minutes stands</td></tr>
+        <tr><td><span class="id">R-03</span> Restated KPIs rejected</td><td><span class="chip hi">High</span></td><td>Present week 4 with the evidence. Not accepted by week 5 → escalate; do not build views on numbers nobody will stand behind</td></tr>
+        <tr><td><span class="id">R-09</span> <s>Graph access refused or delayed</s> — <b>closed, and the dependency removed</b></td><td><span class="chip lo">Closed</span></td><td>Feedback is in the CRM payload. No app registration, no Graph client, no Microsoft dependency of any kind</td></tr>
+        <tr><td><span class="id">R-14</span> The CRM cannot enumerate its enrollable population</td><td><span class="chip hi">High</span></td><td><b>The only open risk, and the only open question.</b> Attendees span <b>5 companies</b>; the CRM returns a complete numerator but no denominator, since anyone who never attended is absent from the payload. The headcount sheet cannot substitute — 212 employees of one company, and <b>272 of the 417 who trained are not in it</b>. Asked for: an employees endpoint, or at minimum one active-employee count per company. Fallback: scope <b>both</b> sides of the ratio to one entity and label it — never mix populations</td></tr>
+        <tr><td><span class="id">R-13</span> Internal/External cannot be verified independently</td><td><span class="chip med">Med</span></td><td>The CRM holds no trainer email, so the value is taken on trust; <code>PROGRAM_TYPE_MISMATCH</code> is a name-based advisory only. Ask the CRM team for a trainer email field</td></tr>
+        <tr><td><span class="id">R-12</span> LinkedIn is a third source added after the estimate</td><td><span class="chip med">Med</span></td><td>Additive, not foundational. Scheduled weeks 7–8 and cut first if the schedule tightens. The Graph work it displaced was larger, so net scope has fallen</td></tr>
+        <tr><td><span class="id">R-10</span> <s>Forms topic/trainer strings match CRM poorly</s> — <b>closed</b></td><td><span class="chip lo">Closed</span></td><td>Answers arrive attached to their program and respondent by id. The whole free-text matching layer is deleted, along with its two exception rules</td></tr>
+        <tr><td><span class="id">R-02</span> <s>Trainer absent from the CRM</s> — <b>closed</b>, but only as a name</td><td><span class="chip med">Med</span></td><td>Q-01: the CRM holds the trainer, as free text per session rather than a reference. 16 strings, one person spelled two ways, three sessions naming two trainers. Ask the CRM team for a trainer id; a local alias map is the fallback</td></tr>
+        <tr><td><span class="id">R-04/05</span> Thin CRM history · <s>no HRIS history</s></td><td><span class="chip med">Med</span></td><td>CRM sessions run back to September 2025. The HRIS is out of scope, so employee history is whatever the CRM snapshots capture: SCD2 from day one, pre-launch periods labelled estimated</td></tr>
+        <tr><td><span class="id">R-06</span> <s>Identity resolution fails at the edges</s> — <b>closed</b></td><td><span class="chip lo">Closed</span></td><td>2,218 user objects, 417 people, a perfect 1:1 between <code>employee_code</code>, <code>odoo_id</code> and <code>user.id</code>, none missing, no code carrying two names. The workbook's 38 unjoinable rows were an export artefact. The exception queue still ships, and starts empty</td></tr>
+        <tr><td><span class="id">R-07</span> PII obligations expand</td><td><span class="chip lo">Low</span></td><td>Downgraded. With no HRIS integration the platform never touches national ID or payscale — the CRM does not expose them. The allowlist test stays as a regression guard; sign-off in week 10 stands</td></tr>
+        
+        <tr><td><span class="id">R-15</span> Quality scores fall for an unexpected reason</td><td><span class="chip med">Med</span></td><td>Removing the hidden filter moves NPS 92.7 &rarr; 84.4 and Logistics 96.4 &rarr; 92.2. Present with participation rate in week 4 as one scope correction, not two separate declines</td></tr>
+        <tr><td><span class="id">R-08</span> Over-engineering the infrastructure</td><td><span class="chip med">Med</span></td><td>Any PR introducing a warehouse, bus, dbt or Kubernetes is rejected on sight</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Accepted when</h3>
+  <ol>
+    <li>Every CRM program appears, count matching the CRM exactly — automated nightly check on the health page.</li>
+    <li>Every KPI computes to a value L&amp;D signed in the reconciliation, and participation rate is published only once its numerator and denominator cover the same entity set.</li>
+    <li>The monthly report takes under 30 minutes of human work — timed observation in week 10.</li>
+    <li>It has generated and delivered by email with no human step for one full cycle.</li>
+    <li>Any KPI drills to its source records — E2E test asserts the drill count equals the KPI at every grain.</li>
+    <li>No record excluded without an exception — the transform invariant, alarmed on failure.</li>
+    <li>Every view returns within 2 seconds at p95 against 15,000 rows.</li>
+    <li>The metric suite passes on the release commit.</li>
+    <li>Coverage, funnel and scorecards live and exportable.</li>
+    <li>A full parallel run completed with all differences explained.</li>
+  </ol>
+
+  <h3>After v1</h3>
+  <p>Deferred, not dropped, and the model must not preclude them: plan-versus-actual (add
+  <code>fact_plan</code> &mdash; L&amp;D runs a rolling <b>two-month evaluate / six-month plan</b> cycle, so the natural grain is a six-month plan, not an annual one) · sector-head
+  access (the scope hook ships unused in v1) · cost and ROI · skills tracking. Write-back to the CRM would
+  be a new project, not an enhancement.</p>
+</section>
+
+<footer>
+  L&amp;D Analytics Platform · delivery plan · ten weeks, six phases, two engineers<br>
+  Follows BRD v1.5, amended by the live CRM integration · two sources, eleven DQ rules · Q-15 open · 2 September 2026
+</footer>
+
+</div>

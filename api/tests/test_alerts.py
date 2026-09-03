@@ -30,7 +30,12 @@ CRM = Source.CRM
 HRIS = Source.HRIS
 PROGRAM = Entity.PROGRAM
 
-NOW = datetime(2026, 9, 1, 12, 0, tzinfo=UTC)
+# Anchored to the real clock, not a fixed date. Several rows here take their
+# timestamps from the column defaults, which are `now()` on the server; a NOW
+# hard-coded in the past then resolves them before they were first seen and
+# trips ck_alert_notification_resolved_after_first_seen. Every assertion below
+# is relative to this anchor, so the suite does not expire.
+NOW = datetime.now(UTC).replace(microsecond=0)
 RENOTIFY = timedelta(hours=6)
 
 

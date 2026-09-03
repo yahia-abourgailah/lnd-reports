@@ -12,18 +12,28 @@ help: ## Show this help
 
 # --------------------------------------------------------------- local dev
 .PHONY: init
-init: ## First-time setup: create .env from the template
-	@test -f .env || (cp .env.example .env && \
-	  python3 -c "import secrets,pathlib; p=pathlib.Path('.env'); \
-p.write_text(p.read_text().replace('generate-a-real-one-with-secrets-token-urlsafe-48', secrets.token_urlsafe(48)))" && \
-	  echo "created .env with a generated SESSION_SECRET")
-	@echo "Now fill in OIDC_* when the app registration exists (Q-14)."
+init: .env ## First-time setup: create .env from the template
+	@echo "  .env is ready. Fill in CRM_BASE_URL, CRM_SERVICE_KEY and OIDC_* as they arrive."
+
+# .env is a real file target, so it is created once and never overwritten —
+# your CRM key and generated secrets survive every later `make up`.
+.env: .env.example
+	@test -f $@ || { \
+	  cp $< $@ && \
+	  python3 -c "import pathlib, re, secrets; \
+p = pathlib.Path('.env'); t = p.read_text(); \
+t = t.replace('generate-a-real-one-with-secrets-token-urlsafe-48', secrets.token_urlsafe(48)); \
+t = re.sub(r'^(POSTGRES_PASSWORD|APP_DB_PASSWORD)=.*\$$', lambda m: m.group(1) + '=' + secrets.token_urlsafe(24), t, flags=re.M); \
+p.write_text(t)" && \
+	  echo '  created .env — SESSION_SECRET and both database passwords generated'; \
+	}
+	@touch $@
 
 .PHONY: up
-up: ## Start the full stack in dev (http://localhost:8080)
+up: .env ## Start the full stack in dev (http://localhost:8080)
 	docker compose $(DEV) up --build -d
 	@$(MAKE) --no-print-directory migrate
-	@echo "→ http://localhost:8080"
+	@echo "→ http://localhost:8080   ·   pgAdmin http://127.0.0.1:8082   ·   API docs /v1/docs"
 
 .PHONY: down
 down: ## Stop the dev stack

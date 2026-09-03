@@ -92,10 +92,23 @@ def sync_incremental() -> dict[str, int]:
 
 
 @celery_app.task(name="lnd.sync.full_reconcile")
-def sync_full_reconcile() -> dict[str, str]:
-    """The nightly pass, which also reconciles deletions (FR-A08)."""
-    log.info("full reconcile (not yet implemented)", extra={"event": "sync.full.stub"})
-    return {"status": "not_implemented"}
+def sync_full_reconcile() -> dict[str, int]:
+    """The nightly pass, which also reconciles deletions (FR-A08).
+
+    Fetches identically to the incremental one — the CRM exposes no
+    `updated_at` filter, so both ask for everything and change detection is by
+    payload hash. The difference is that this pass may conclude a record has
+    gone: anything present before and absent from a complete pull is marked
+    vanished, and the count feeds the alert that watches for a reconcile
+    removing more than it plausibly should.
+
+    Nothing is erased. A vanished record keeps every raw version it ever had
+    and simply stops being present, so the week-3 transform excludes it from
+    core while the history stays available to the week-10 reconciliation.
+    """
+    from lnd.sync.runner import configured_pullers, run_all, summarise
+
+    return summarise(run_all(configured_pullers(), mode=SyncMode.FULL_RECONCILE))
 
 
 @celery_app.task(name="lnd.reports.monthly")

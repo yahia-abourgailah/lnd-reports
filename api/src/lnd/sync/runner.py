@@ -40,6 +40,7 @@ from lnd.ingest.models import Entity, Source
 from lnd.models import SyncMode, SyncStatus, SyncTrigger
 from lnd.sync.backoff import honours_retryable_flag, retry
 from lnd.sync.breaker import check_breaker
+from lnd.sync.presence import mark_seen, reconcile_absent
 from lnd.sync.pullers import Record, SourcePuller
 from lnd.sync.runs import SyncAlreadyRunning, record_sync_run
 
@@ -57,6 +58,8 @@ class SyncSummary:
     fetched: int = 0
     landed: int = 0
     unchanged: int = 0
+    #: Records present before and absent now. Only a full pass sets this.
+    deleted: int = 0
 
     @property
     def changed(self) -> bool:
@@ -98,6 +101,7 @@ def run_sync(
             describe=f"{puller.source}.{puller.entity}",
         )
 
+        gone: list[str] = []
         with session_scope() as session:
             landed = land(
                 session,
@@ -107,8 +111,35 @@ def run_sync(
                 sync_run_id=run.run_id,
             )
 
-        run.count(fetched=landed.received, written=landed.landed)
-        run.note(unchanged=landed.unchanged, filtered=changed_since is not None)
+            # Presence is recorded on every pass, so a record that returns after
+            # vanishing is present again without anyone intervening.
+            mark_seen(
+                session,
+                source=puller.source,
+                entity=puller.entity,
+                source_ids=[source_id for source_id, _ in records],
+                seen_at=position,
+                sync_run_id=run.run_id,
+            )
+
+            # Only a full pass may conclude anything is absent (FR-A08). An
+            # incremental that narrowed its query sees a subset by construction,
+            # and treating a subset as the whole world would soft-delete the
+            # catalogue every half hour.
+            if mode is SyncMode.FULL_RECONCILE:
+                gone = reconcile_absent(
+                    session,
+                    source=puller.source,
+                    entity=puller.entity,
+                    seen_at=position,
+                )
+
+        run.count(fetched=landed.received, written=landed.landed, deleted=len(gone))
+        run.note(
+            unchanged=landed.unchanged,
+            filtered=changed_since is not None,
+            vanished=gone[:50] if gone else None,
+        )
         run.advance_to(position)
         completed = True
 
@@ -130,6 +161,7 @@ def run_sync(
         fetched=run.records_fetched,
         landed=run.records_written,
         unchanged=run.records_fetched - run.records_written,
+        deleted=run.records_deleted,
     )
 
 
@@ -198,5 +230,6 @@ def summarise(summaries: Iterable[SyncSummary]) -> dict[str, int]:
         "fetched": sum(summary.fetched for summary in summaries),
         "landed": sum(summary.landed for summary in summaries),
         "unchanged": sum(summary.unchanged for summary in summaries),
+        "deleted": sum(summary.deleted for summary in summaries),
         "skipped": sum(1 for summary in summaries if summary.status is SyncStatus.SKIPPED),
     }

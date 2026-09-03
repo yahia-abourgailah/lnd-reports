@@ -43,12 +43,14 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     Index,
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -364,3 +366,54 @@ class AlertNotification(Base):
     def __repr__(self) -> str:
         state = "live" if self.is_live else "resolved"
         return f"<AlertNotification {self.alert_key} {self.severity} {state} x{self.times_sent}>"
+
+
+class SourcePresence(Base):
+    """Whether a source record still exists, and when it was last seen.
+
+    `raw` is append-only, so "the CRM no longer returns this program" cannot be
+    written there — and it is not a payload the source sent, it is an
+    observation about a pull. It belongs with the sync audit.
+
+    A vanished record keeps every raw version it ever had. Nothing is erased; it
+    stops being present, and the week-3 transform soft-deletes from `core` on
+    that basis. Only a full reconcile may set `is_present = false`: an
+    incremental pass sees a subset by construction, and treating a subset as the
+    whole world would soft-delete the catalogue on every run.
+    """
+
+    __tablename__ = "source_presence"
+    __table_args__ = (
+        UniqueConstraint("source", "entity", "source_id", name="uq_source_presence"),
+        # Present rows have not vanished; absent rows have a time they went.
+        # Total on both sides, so the pair cannot drift apart.
+        CheckConstraint(
+            "is_present = (vanished_at IS NULL)",
+            name="ck_source_presence_absent_has_a_time",
+        ),
+        CheckConstraint(
+            "last_seen_at >= first_seen_at",
+            name="ck_source_presence_seen_order",
+        ),
+        # "What is still here?" — the transform's inclusion list, run every pass.
+        Index("ix_source_presence_current", "source", "entity", "is_present"),
+        {"schema": SCHEMA_OPS},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    source: Mapped[Source] = mapped_column(_enum_column(Source, "sync_source"), nullable=False)
+    entity: Mapped[Entity] = mapped_column(_enum_column(Entity, "sync_entity"), nullable=False)
+    #: The natural key exactly as the source spells it, matching raw.source_record.
+    source_id: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    #: Which run last saw it, so a disappearance is traceable to a pull.
+    last_seen_run_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+
+    is_present: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    vanished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    def __repr__(self) -> str:
+        state = "present" if self.is_present else "vanished"
+        return f"SourcePresence({self.source}/{self.entity}/{self.source_id} {state})"

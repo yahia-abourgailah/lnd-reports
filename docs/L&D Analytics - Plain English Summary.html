@@ -1,0 +1,499 @@
+<title>L&amp;D Platform in Plain English</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;600;700&family=Literata:opsz,wght@7..72,400;7..72,500;7..72,600&display=swap">
+
+<style>
+:root{
+  --ground:#F3F2F0; --surface:#FFFFFF; --surface-2:#EAE7E9; --surface-3:#DFDADE;
+  --ink:#211E24; --ink-2:#48424C; --ink-3:#726A76;
+  --rule:#DAD5DA; --rule-2:#C2B9C3;
+  --accent:#6E3A62; --accent-2:#54254A; --accent-soft:#F0E6EE;
+  --good:#2C6244; --good-soft:#DFEDE4;
+  --warn:#8A5A16; --warn-soft:#F5E9D4;
+  --shadow:0 1px 2px rgba(33,30,36,.05),0 10px 30px -22px rgba(33,30,36,.45);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#141216; --surface:#1C191F; --surface-2:#252029; --surface-3:#2F2934;
+    --ink:#EDE8EE; --ink-2:#BDB4C0; --ink-3:#8A8090;
+    --rule:#2C2630; --rule-2:#413947;
+    --accent:#CE9BC2; --accent-2:#E6C4DE; --accent-soft:#2C1B29;
+    --good:#79C295; --good-soft:#182D21;
+    --warn:#D8A852; --warn-soft:#302410;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -22px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#141216; --surface:#1C191F; --surface-2:#252029; --surface-3:#2F2934;
+  --ink:#EDE8EE; --ink-2:#BDB4C0; --ink-3:#8A8090;
+  --rule:#2C2630; --rule-2:#413947;
+  --accent:#CE9BC2; --accent-2:#E6C4DE; --accent-soft:#2C1B29;
+  --good:#79C295; --good-soft:#182D21;
+  --warn:#D8A852; --warn-soft:#302410;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -22px rgba(0,0,0,.9);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:"Literata",Georgia,"Times New Roman",serif;
+  font-size:17px; line-height:1.72; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:720px; margin:0 auto; padding:0 26px 100px}
+
+h1,h2,h3,.ui{font-family:"Karla",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+
+/* masthead */
+header.mast{padding:70px 0 8px}
+.kicker{font-family:"Karla",sans-serif; font-size:12px; font-weight:600; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--accent); margin:0 0 20px}
+h1{font-size:clamp(34px,7vw,52px); font-weight:700; line-height:1.08; letter-spacing:-.03em;
+  margin:0 0 22px; text-wrap:balance}
+.sub{font-size:20px; line-height:1.6; color:var(--ink-2); margin:0 0 34px}
+.meta{font-family:"Karla",sans-serif; font-size:13.5px; color:var(--ink-3); border-top:1px solid var(--rule);
+  border-bottom:1px solid var(--rule); padding:14px 0; display:flex; flex-wrap:wrap; gap:8px 28px}
+.meta b{color:var(--ink); font-weight:600}
+
+/* sections */
+section{padding-top:58px}
+h2{font-size:29px; font-weight:700; letter-spacing:-.022em; line-height:1.2; margin:0 0 16px;
+  text-wrap:balance}
+h3{font-size:19px; font-weight:600; letter-spacing:-.012em; margin:34px 0 10px}
+p{margin:0 0 18px}
+ul,ol{margin:0 0 20px; padding-left:24px}
+li{margin-bottom:10px}
+li::marker{color:var(--accent)}
+strong{font-weight:600; color:var(--ink)}
+.ui{font-family:"Karla",sans-serif}
+
+/* big number line */
+.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:24px;
+  margin:30px 0 34px; padding:26px 0; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule)}
+.stat .n{font-family:"Karla",sans-serif; font-size:38px; font-weight:700; letter-spacing:-.03em;
+  line-height:1; color:var(--accent); font-variant-numeric:tabular-nums}
+.stat .l{font-family:"Karla",sans-serif; font-size:13.5px; line-height:1.45; color:var(--ink-2);
+  margin-top:9px}
+
+/* before / after */
+.ba{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--rule);
+  border:1px solid var(--rule); margin:26px 0 30px}
+.ba > div{background:var(--surface); padding:20px 22px}
+.ba h4{font-family:"Karla",sans-serif; font-size:12px; font-weight:700; letter-spacing:.12em;
+  text-transform:uppercase; margin:0 0 14px; color:var(--ink-3)}
+.ba.now h4{color:var(--ink-3)}
+.ba ul{margin:0; padding-left:19px; font-size:15px; line-height:1.6}
+.ba li{margin-bottom:9px}
+.ba .after h4{color:var(--accent)}
+.ba .after li::marker{color:var(--accent)}
+
+/* callout */
+.box{background:var(--surface); border-left:4px solid var(--accent); padding:22px 26px; margin:28px 0;
+  box-shadow:var(--shadow)}
+.box.warn{border-left-color:var(--warn)}
+.box.good{border-left-color:var(--good)}
+.box .t{font-family:"Karla",sans-serif; font-size:12px; font-weight:700; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--accent); margin:0 0 10px}
+.box.warn .t{color:var(--warn)}
+.box.good .t{color:var(--good)}
+.box p:last-child, .box ul:last-child{margin-bottom:0}
+
+/* stage list */
+.stage{display:grid; grid-template-columns:64px 1fr; gap:22px; padding:26px 0;
+  border-top:1px solid var(--rule)}
+.stage:last-of-type{border-bottom:1px solid var(--rule)}
+.stage .when{font-family:"Karla",sans-serif}
+.stage .when .w{font-size:11.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink-3); line-height:1.3}
+.stage .when .big{font-size:30px; font-weight:700; letter-spacing:-.03em; color:var(--accent);
+  line-height:1; margin-top:4px; font-variant-numeric:tabular-nums}
+.stage h3{margin:0 0 8px; font-size:19px}
+.stage p{margin:0 0 12px; font-size:16px}
+.stage .done{font-family:"Karla",sans-serif; font-size:14px; color:var(--ink-2); background:var(--surface-2);
+  padding:11px 15px; border-radius:3px; margin:0}
+.stage .done b{font-weight:700; color:var(--ink)}
+
+/* simple table */
+.tw{overflow-x:auto; margin:24px 0 30px; border:1px solid var(--rule); background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-family:"Karla",sans-serif; font-size:14.5px; min-width:460px}
+th{text-align:left; font-size:11.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink-3); padding:13px 16px; border-bottom:1px solid var(--rule-2)}
+td{padding:13px 16px; border-bottom:1px solid var(--rule); vertical-align:top; color:var(--ink-2)}
+tr:last-child td{border-bottom:none}
+td:first-child{color:var(--ink); font-weight:500}
+td.n{font-variant-numeric:tabular-nums; white-space:nowrap}
+
+/* ask list */
+.ask{background:var(--accent-soft); border:1px solid var(--rule); padding:24px 26px; margin:26px 0}
+.ask h3{margin-top:0}
+.ask ul{margin-bottom:0}
+.ask li::marker{color:var(--accent)}
+
+footer{margin-top:70px; padding-top:26px; border-top:2px solid var(--ink);
+  font-family:"Karla",sans-serif; font-size:13px; color:var(--ink-3); line-height:1.7}
+
+@media (max-width:560px){
+  body{font-size:16px}
+  .wrap{padding:0 20px 80px}
+  header.mast{padding:44px 0 8px}
+  .ba{grid-template-columns:1fr}
+  .stage{grid-template-columns:1fr; gap:10px}
+  .stage .when{display:flex; align-items:baseline; gap:10px}
+  .stage .when .big{margin-top:0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="kicker">L&amp;D Analytics Platform</p>
+  <h1>What we are building, and what we need from you</h1>
+  <p class="sub">Today the L&amp;D report is built by hand in Excel. It takes one to two working days
+  every cycle, it misses more than half of the training we actually deliver, and a few of the numbers
+  in it are wrong. This is the plan to replace it.</p>
+  <div class="meta ui">
+    <span><b>Time needed</b> 10 weeks + 1 preparation week</span>
+    <span><b>Written</b> 30 August 2026</span>
+  </div>
+</header>
+
+<!-- ============================================ -->
+<section>
+  <h2>The problem, in one page</h2>
+
+  <p>Every reporting cycle, someone downloads attendance sheets from the CRM, pastes them into a
+  spreadsheet, and types in seven pieces of information by hand for each training program. Then they
+  refresh fourteen pivot tables and copy the results into a dashboard tab.</p>
+
+  <p>This takes <strong>eight to twelve hours</strong>. But the time is not the worst part. Three things
+  are more serious:</p>
+
+  <div class="stats">
+    <div class="stat"><div class="n">25 of 55</div><div class="l ui">Training programs that reach the report. The CRM holds 55. Leadership sees less than half of what L&amp;D delivers.</div></div>
+    <div class="stat"><div class="n">3</div><div class="l ui">Published numbers that are provably wrong. Not opinions &mdash; we can show the broken formulas in the file.</div></div>
+    <div class="stat"><div class="n">52</div><div class="l ui">Attendance records that quietly disappear from sector reporting, because the person could not be matched to HR.</div></div>
+  </div>
+
+  <h3>The three wrong numbers</h3>
+
+  <p><strong>Participation rate is too high.</strong> The formula divides by 192 people. That number is
+  typed into the spreadsheet by hand and never changes. We actually have 212 employees. So the real
+  participation rate is 60.4%, not the 66.7% we have been reporting.</p>
+
+  <p><strong>Programs are being merged by accident.</strong> The report groups training by its
+  <em>title</em>. But the CRM ran "Hard Talks" twice, as two separate programs. Because both have the
+  same title, the spreadsheet treats them as one. Real deliveries are disappearing into each other.</p>
+
+  <p><strong>Our NPS score is calculated the wrong way.</strong> NPS is a ratio, and ratios cannot be
+  averaged. The spreadsheet averages them. This only gives the right answer if every group has exactly
+  the same number of responses &mdash; which is never true. Every trainer and program comparison built on
+  it is misweighted.</p>
+
+  <p>There is also a fourth, smaller one: one trainer's name is spelled two different ways
+  ("Ahmed Elshiaty" and "Ahmed ElShiaty"), so his 41 evaluations are split into two people, and neither
+  row shows his real performance.</p>
+
+  <div class="box">
+    <p class="t">Why this happens</p>
+    <p>None of this is anyone's mistake. It is what happens when a spreadsheet grows past what a
+    spreadsheet can do. The file has no way to check itself, so when something goes wrong, it goes wrong
+    quietly. The platform's main job is to stop things failing silently.</p>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section>
+  <h2>What we are building</h2>
+
+  <p>A private website, used inside the company, that L&amp;D logs into with their normal company
+  account.</p>
+
+  <p>It connects directly to the CRM and to the HR system, and pulls the training data across
+  <strong>automatically, every thirty minutes</strong>. Nobody downloads anything. Nobody pastes anything.
+  The dashboard is simply always up to date.</p>
+
+  <p>On top of that data it shows the same numbers L&amp;D reports today &mdash; programs, training days,
+  participants, hours, participation rate, NPS, the four quality scores &mdash; plus the things Excel could
+  never answer: which departments have had no training at all, how many people enrolled but did not show
+  up, how each trainer is really performing, and how many people actually filled in the survey.</p>
+
+  <p>Every number can be clicked. Clicking it shows you the exact rows of data that produced it. If a
+  figure looks wrong, you can see why in a few seconds instead of hunting through twelve worksheets.</p>
+
+  <p>Once a month, the report writes itself and emails itself to the recipient list. It arrives as an
+  Excel file laid out like the one people already receive, so nobody outside L&amp;D has to learn
+  anything new.</p>
+
+  <h3>Before and after</h3>
+  <div class="ba">
+    <div class="now">
+      <h4>Today</h4>
+      <ul>
+        <li>8&ndash;12 hours of manual work per cycle</li>
+        <li>25 of 55 programs reported</li>
+        <li>Numbers cannot be traced or checked</li>
+        <li>Bad records vanish with no warning</li>
+        <li>Participation rate divides by a typed-in number</li>
+        <li>Top learners typed in by hand</li>
+        <li>Report is assembled and sent by a person</li>
+      </ul>
+    </div>
+    <div class="after">
+      <h4>After</h4>
+      <ul>
+        <li>Under 30 minutes, and only for checking</li>
+        <li>All 55 programs reported</li>
+        <li>Click any number to see the records behind it</li>
+        <li>Bad records go to a queue that someone clears</li>
+        <li>Participation uses real headcount for that month</li>
+        <li>Top learners calculated automatically</li>
+        <li>Report sends itself on schedule</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section>
+  <h2>The plan, stage by stage</h2>
+  <p>Eleven weeks in total. One week of preparation, then ten weeks of building. Each stage only starts
+  when the one before it is finished, so nothing is built on an assumption we have not checked.</p>
+
+  <div class="stage">
+    <div class="when ui"><div class="w">Before we start</div><div class="big">W0</div></div>
+    <div>
+      <h3>Answering the open questions</h3>
+      <p>Before any building, we need answers to a handful of questions about the CRM and the HR system.
+      The biggest one: does the CRM actually allow another system to read its data automatically? If it
+      does not, this becomes a longer project, and we need to know that now rather than in week eight.</p>
+      <p class="done"><b>Finished when:</b> the questions are answered in writing and we can confirm the
+      ten-week plan is real.</p>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="when ui"><div class="w">Weeks</div><div class="big">1&ndash;2</div></div>
+    <div>
+      <h3>Connecting to the CRM and HR</h3>
+      <p>We build the connection that pulls training and employee data across automatically, and keeps
+      pulling it every thirty minutes. We store an untouched copy of everything exactly as it arrives, so
+      that if a number ever looks strange later, we can prove whether it arrived wrong or we broke it.</p>
+      <p class="done"><b>Finished when:</b> both systems feed us on schedule, and if the CRM goes down the
+      dashboard keeps showing the last good data instead of breaking.</p>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="when ui"><div class="w">Weeks</div><div class="big">3&ndash;4</div></div>
+    <div>
+      <h3>Fixing the numbers &mdash; and agreeing them with you</h3>
+      <p>We organise the data properly and write each metric down <em>once</em>, in one place, so the
+      dashboard, the Excel export and the tests can never disagree with each other. Every wrong
+      calculation from the list above gets corrected here.</p>
+      <p>Then we sit down with L&amp;D and go through every single number, old value against new value,
+      with the reason it changed. <strong>This conversation happens in week 3, not at the end.</strong></p>
+      <p class="done"><b>Finished when:</b> L&amp;D has seen every corrected number and accepted it in
+      writing.</p>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="when ui"><div class="w">Weeks</div><div class="big">5&ndash;6</div></div>
+    <div>
+      <h3>The dashboard</h3>
+      <p>The main screen with all the headline numbers, filters for date, sector, department, trainer and
+      program, monthly trends, and the ability to click any number and see the records behind it. Plus a
+      small admin screen where L&amp;D fills in the two pieces of information the CRM does not hold.</p>
+      <p class="done"><b>Finished when:</b> someone from L&amp;D can reproduce their current dashboard on
+      the new platform without help.</p>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="when ui"><div class="w">Weeks</div><div class="big">7&ndash;8</div></div>
+    <div>
+      <h3>The new analysis, and exports</h3>
+      <p>The views Excel could never give us: a scorecard per program, a scorecard per trainer, a coverage
+      view showing who has had no training, and the funnel from enrolled to attended to evaluated. Then
+      the export buttons and the automatic monthly Excel report.</p>
+      <p class="done"><b>Finished when:</b> every view is live, and the generated monthly report can be
+      put side by side with the old spreadsheet.</p>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="when ui"><div class="w">Week</div><div class="big">9</div></div>
+    <div>
+      <h3>Catching problems, and switching on automation</h3>
+      <p>We build the queue that catches bad records &mdash; a person we cannot match to HR, a session
+      with no timing, someone scanned twice. Nothing is ever thrown away silently. And we switch on the
+      scheduled email so the monthly report sends itself.</p>
+      <p class="done"><b>Finished when:</b> the monthly report generates and sends with nobody
+      touching it.</p>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="when ui"><div class="w">Week</div><div class="big">10</div></div>
+    <div>
+      <h3>Running both systems side by side, then handing over</h3>
+      <p>For one full reporting cycle we run the platform and the spreadsheet together and compare them
+      line by line. Every difference must have a reason. Then training, documentation, sign-off, and the
+      old workbook is retired.</p>
+      <p class="done"><b>Finished when:</b> L&amp;D signs off, and the spreadsheet is closed for
+      good.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section>
+  <h2>The one difficult conversation</h2>
+
+  <div class="box warn">
+    <p class="t">Please read this part</p>
+    <p>When we fix the broken calculations, <strong>some of our headline numbers will look worse</strong>.
+    Participation rate drops from 66.7% to 60.4%. Some trainers' scores will move. Sector numbers will
+    shift.</p>
+  </div>
+
+  <p>Nothing about our actual performance has changed. The training we delivered in February is exactly
+  the same training. Only the arithmetic describing it has been corrected.</p>
+
+  <p>This is why we bring it to L&amp;D in <strong>week 3</strong>, with the evidence in hand &mdash; the
+  192 typed into the spreadsheet, the two "Hard Talks" programs, the two spellings of one trainer's name.
+  It is much easier to explain a correction in advance than to defend a surprise at launch.</p>
+
+  <p>There is also good news in the same direction. Because the platform reports all 55 programs instead
+  of 25, several numbers will go <em>up</em>: total programs, total participants, total training hours.
+  We have simply not been getting credit for a large part of the work.</p>
+</section>
+
+<!-- ============================================ -->
+<section>
+  <h2>What we need from you</h2>
+
+  <div class="ask">
+    <h3>Four decisions, before week 1</h3>
+    <ul>
+      <li><strong>How should we count external attendees and new hires?</strong> 52 attendance records
+      belong to people with no employee code. Should they count in the participation rate or not?
+      <em>(L&amp;D Director)</em></li>
+      <li><strong>Should the 30 missing programs be added to history?</strong> The CRM has 30 programs the
+      spreadsheet never included. Do we go back and report them, or start fresh from launch?
+      <em>(L&amp;D Director)</em></li>
+      <li><strong>Which employee information may we store?</strong> We would like to leave out national ID
+      and pay grade entirely, since no report needs them. <em>(HR Leadership)</em></li>
+      <li><strong>Scope or people.</strong> The ten weeks are completely full. We either drop the eight
+      "nice to have" features, or add one more engineer. <em>(L&amp;D Director + Engineering Lead)</em></li>
+    </ul>
+  </div>
+
+  <h3>One day a week from an L&amp;D specialist</h3>
+  <p>This is the part most likely to be underestimated, so it is worth being direct about it. One named
+  person from L&amp;D needs <strong>one day per week for the whole project</strong>. They fill in the
+  information the CRM does not hold, decide what to do with problem records, and test that the platform
+  actually answers their real questions.</p>
+  <p>If that person is not available, weeks 5&ndash;6 and weeks 9&ndash;10 stall no matter how much
+  progress engineering makes. Please name the person at kick-off and protect their time.</p>
+
+  <h3>Access, in week 0</h3>
+  <ul>
+    <li>Read-only access to the CRM for the engineering team, and someone from the CRM side who can answer
+    questions.</li>
+    <li>Read-only access to the HR system.</li>
+    <li>IT to set up the login so people sign in with their normal company account.</li>
+  </ul>
+</section>
+
+<!-- ============================================ -->
+<section>
+  <h2>What could go wrong</h2>
+  <p>Four honest risks, in the order we worry about them.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Risk</th><th>What we do about it</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>The CRM cannot share its data automatically</td>
+          <td>We find out in week 0, before the clock starts. If so, we fall back to reading the CRM's
+          export file on a schedule. It still works, but data refreshes daily instead of every 30 minutes,
+          and the project gets about three weeks longer.</td>
+        </tr>
+        <tr>
+          <td>There is no spare time in the ten weeks</td>
+          <td>The work adds up to 44 person-weeks and the team supplies 45. That leaves no room for
+          sickness, holidays or surprises. This is why we ask for the scope decision up front. It is the
+          single most likely cause of a late delivery.</td>
+        </tr>
+        <tr>
+          <td>The corrected numbers are rejected</td>
+          <td>We present them in week 3 with the evidence, not at the end. If they are not accepted by
+          week 4 we stop and escalate, rather than building screens on numbers nobody will stand
+          behind.</td>
+        </tr>
+        <tr>
+          <td>The CRM does not record who the trainer was</td>
+          <td>We check this in week 0. If it does not, L&amp;D will need to fill in the trainer for 55
+          programs by hand before launch, and we ask the CRM team to add the field later.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section>
+  <h2>How we will know it worked</h2>
+  <p>We are not finished when the software runs. We are finished when all of the following are true:</p>
+  <ul>
+    <li>Every program in the CRM appears in the dashboard, and the count matches the CRM exactly.</li>
+    <li>L&amp;D has signed off every corrected number.</li>
+    <li>Producing the monthly report takes under 30 minutes, and that time is spent checking, not
+    assembling.</li>
+    <li>The monthly report has sent itself by email, with nobody involved, for one full cycle.</li>
+    <li>Any number on any screen can be clicked to show the records behind it.</li>
+    <li>No record is ever left out of a report without appearing in the problem queue.</li>
+    <li>Every screen loads in under two seconds.</li>
+    <li>The platform and the spreadsheet have run side by side for a full cycle, and every difference
+    between them has a written explanation.</li>
+  </ul>
+</section>
+
+<!-- ============================================ -->
+<section>
+  <h2>What is not included this time</h2>
+  <p>These are deliberately left out of the first version. Not forgotten &mdash; the system is being
+  designed so each can be added later without rebuilding anything.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Not included</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Plan versus actual</td><td>There is no annual training plan stored anywhere in a structured form yet. The empty "Planned" column in the spreadsheet is the whole plan today.</td></tr>
+        <tr><td>LinkedIn Learning</td><td>We have no automatic data feed from it. Right now it is tracked on a hand-typed sheet.</td></tr>
+        <tr><td>Access for sector heads and executives</td><td>Version 1 is for the L&amp;D team only. Opening it wider means controlling who can see whose data, which is a piece of work in itself. Leadership receives exported reports instead.</td></tr>
+        <tr><td>Cost and return on investment</td><td>Neither the CRM nor HR holds any training cost data. There is nothing to calculate from.</td></tr>
+        <tr><td>Skills and certification tracking</td><td>A different project. It needs a competency framework first.</td></tr>
+        <tr><td>Changing anything in the CRM</td><td>Deliberate. The platform only ever reads. It can never edit or delete anything in the CRM, by design.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="box good">
+    <p class="t">In short</p>
+    <p>Eleven weeks. Four engineers, plus one day a week from L&amp;D. Four decisions needed before we
+    start. At the end, the report builds itself, covers all our training instead of half of it, and every
+    number in it can be checked by clicking on it.</p>
+  </div>
+</section>
+
+<footer>
+  L&amp;D Analytics Platform &middot; plain-language summary of the delivery plan<br>
+  Based on Business Requirements Document v1.0 &middot; 30 August 2026<br>
+  A detailed technical version of this plan exists for the engineering team.
+</footer>
+
+</div>
