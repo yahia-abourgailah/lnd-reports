@@ -35,6 +35,19 @@ x-api-env: &api-env
   AUTH_DEV_BYPASS:          ${AUTH_DEV_BYPASS:-false}
   AUTH_DEV_USER_EMAIL:      ${AUTH_DEV_USER_EMAIL:-}
   AUTH_DEV_USER_NAME:       ${AUTH_DEV_USER_NAME:-}
+  # -- source systems ---------------------------------------------------
+  # Defaulted to empty rather than required: the API starts fine without a
+  # CRM, and only the sync tasks need these. Without them the sync fails at
+  # the first call with "CRM_BASE_URL is not configured", which is what
+  # happened before they were listed here at all — `.env` held real values
+  # and no container could see them, so the scheduled 30-minute sync would
+  # have failed the same way in production.
+  CRM_BASE_URL:             ${CRM_BASE_URL:-}
+  CRM_SERVICE_KEY:          ${CRM_SERVICE_KEY:-}
+  CRM_TIMEOUT_SECONDS:      ${CRM_TIMEOUT_SECONDS:-60}
+  CRM_PER_PAGE:             ${CRM_PER_PAGE:-10}
+  CRM_CHANGED_SINCE_FILTER: ${CRM_CHANGED_SINCE_FILTER:-}
+  SOURCE_RECORD_FIXTURES:   ${SOURCE_RECORD_FIXTURES:-false}
 
 services:
   # ------------------------------------------------------------------ proxy

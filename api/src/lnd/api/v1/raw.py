@@ -93,7 +93,11 @@ class RecordDetail(BaseModel):
     source_id: str
     payload_hash: str
     fetched_at: datetime
-    sync_run_id: str | None
+    # `ops.sync_run.id` is a BigInteger. This was declared `str | None` when the
+    # column was still a UUID, and migration 0005 changed the column without
+    # changing the response model — so the API kept type-checking against a key
+    # shape that no longer exists.
+    sync_run_id: int | None
     versions: int
     payload: dict[str, Any]
 
@@ -101,7 +105,7 @@ class RecordDetail(BaseModel):
 class VersionSummary(BaseModel):
     payload_hash: str
     fetched_at: datetime
-    sync_run_id: str | None
+    sync_run_id: int | None
     size_bytes: int
     is_current: bool
 
