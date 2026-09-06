@@ -1,0 +1,891 @@
+{
+  "breakdowns": {
+    "employees_by_company": {
+      "Eclatic Cosmetics": 14,
+      "The Address Developments": 13,
+      "The Address Holding": 10,
+      "The Address Investments": 1318,
+      "The MarQ Communities": 223
+    },
+    "employees_by_job_level": {
+      "(none)": 95,
+      "Associate Director": 22,
+      "Associate Manager": 121,
+      "CEOs -Board Member": 5,
+      "Chief Officer": 5,
+      "Clerk-Worker Supervisor": 15,
+      "Director": 30,
+      "Freelancer": 20,
+      "Head": 16,
+      "Junior Specialist - Worker Senior supervisor": 322,
+      "Manager": 116,
+      "Section Head": 72,
+      "Senior Director": 36,
+      "Senior Manager": 43,
+      "Senior Specialist": 229,
+      "Specialist": 248,
+      "Supervisor": 72,
+      "Teamleader": 54,
+      "Worker A": 4,
+      "Worker B": 7,
+      "Worker C": 46
+    },
+    "employees_by_roster_status": {
+      "False": 148,
+      "True": 1430
+    },
+    "employees_by_sector": {
+      "Business Development": 5,
+      "Business Operations": 1,
+      "Business Relations": 43,
+      "CEO Office": 11,
+      "Commercial": 990,
+      "Commercial & Strategy": 50,
+      "Commercial Eclatic": 7,
+      "Communities & Clients Excellence": 57,
+      "Corporate Operational Excellence": 2,
+      "Corporate Services": 82,
+      "Development & Innovation": 27,
+      "Finance": 50,
+      "Finance Eclatic": 1,
+      "Government Workforce": 18,
+      "Human Resources": 82,
+      "Internal Audit": 1,
+      "Investment": 3,
+      "Marketing": 2,
+      "Marketing & PR": 15,
+      "Planning": 2,
+      "Procurement": 1,
+      "Product Development Eclatic": 1,
+      "Projects": 26,
+      "Public & Governmental Relations": 1,
+      "Sales Operations": 28,
+      "Taxation": 4,
+      "Technology": 58,
+      "Treasury": 9,
+      "sales": 1
+    },
+    "programs_by_computed_status": {
+      "completed": 55,
+      "upcoming": 2
+    },
+    "programs_by_target": {
+      "department": 7,
+      "public": 50
+    },
+    "programs_by_type": {
+      "external": 6,
+      "internal": 51
+    }
+  },
+  "defects": {
+    "companies_among_employees": 5,
+    "distinct_sectors": 29,
+    "programs_lost_to_title_grouping": 16,
+    "trainer_name_variants": 16,
+    "trainers_after_merge": 15,
+    "unresolved_attendance": 0
+  },
+  "exceptions": {
+    "capacity_exceeded": 1,
+    "survey_question_unmapped": 5,
+    "trainer_missing": 2
+  },
+  "history": {
+    "first_session": "2025-07-29",
+    "last_session": "2026-09-23",
+    "sessions": 123,
+    "sessions_by_year": {
+      "2025": 68,
+      "2026": 55
+    },
+    "sessions_without_a_time": 0
+  },
+  "identity": {
+    "attendance": {
+      "odoo_id": 1165
+    },
+    "enrollment": {
+      "odoo_id": 1060
+    },
+    "evaluation": {
+      "odoo_id": 297
+    }
+  },
+  "metrics": {
+    "full_dataset": {
+      "activity_effectiveness": {
+        "denominator": "0.00",
+        "formatted": "—",
+        "numerator": "0.00",
+        "provenance": "corrected",
+        "sample_size": 0,
+        "unit": "percent",
+        "value": null
+      },
+      "blended_learner_hours": {
+        "denominator": null,
+        "formatted": "—",
+        "numerator": null,
+        "provenance": "new",
+        "sample_size": 0,
+        "unit": "hours",
+        "value": null
+      },
+      "coverage_gap": {
+        "denominator": null,
+        "formatted": "1,229",
+        "numerator": null,
+        "provenance": "new",
+        "sample_size": 1430,
+        "unit": "count",
+        "value": "1229.00"
+      },
+      "facilitator_performance": {
+        "denominator": "0.00",
+        "formatted": "—",
+        "numerator": "0.00",
+        "provenance": "unchanged",
+        "sample_size": 0,
+        "unit": "percent",
+        "value": null
+      },
+      "fill_rate": {
+        "denominator": "1476.00",
+        "formatted": "70.9%",
+        "numerator": "1047.00",
+        "provenance": "new",
+        "sample_size": 55,
+        "unit": "percent",
+        "value": "70.93"
+      },
+      "knowledge_relevance": {
+        "denominator": "0.00",
+        "formatted": "—",
+        "numerator": "0.00",
+        "provenance": "corrected",
+        "sample_size": 0,
+        "unit": "percent",
+        "value": null
+      },
+      "learner_hours": {
+        "denominator": null,
+        "formatted": "3,686.5 hours",
+        "numerator": null,
+        "provenance": "unchanged",
+        "sample_size": 1165,
+        "unit": "hours",
+        "value": "3686.50"
+      },
+      "linkedin_hours": {
+        "denominator": null,
+        "formatted": "—",
+        "numerator": null,
+        "provenance": "new",
+        "sample_size": 0,
+        "unit": "hours",
+        "value": null
+      },
+      "lnd_delivered_share": {
+        "denominator": "55.00",
+        "formatted": "89.1%",
+        "numerator": "49.00",
+        "provenance": "renamed",
+        "sample_size": 55,
+        "unit": "percent",
+        "value": "89.09"
+      },
+      "logistics_effectiveness": {
+        "denominator": "0.00",
+        "formatted": "—",
+        "numerator": "0.00",
+        "provenance": "corrected",
+        "sample_size": 0,
+        "unit": "percent",
+        "value": null
+      },
+      "months_since_last_training": {
+        "denominator": null,
+        "formatted": "4.9 months",
+        "numerator": null,
+        "provenance": "new",
+        "sample_size": 287,
+        "unit": "months",
+        "value": "4.93"
+      },
+      "no_show_rate": {
+        "denominator": "1060.00",
+        "formatted": "38.7%",
+        "numerator": "410.00",
+        "provenance": "new",
+        "sample_size": 1060,
+        "unit": "percent",
+        "value": "38.68"
+      },
+      "nps": {
+        "denominator": "0.00",
+        "formatted": "—",
+        "numerator": "0.00",
+        "provenance": "corrected",
+        "sample_size": 0,
+        "unit": "nps",
+        "value": null
+      },
+      "participation_rate": {
+        "denominator": "1430.00",
+        "formatted": "14.1%",
+        "numerator": "201.00",
+        "provenance": "corrected",
+        "sample_size": 1430,
+        "unit": "percent",
+        "value": "14.06"
+      },
+      "public_program_share": {
+        "denominator": "55.00",
+        "formatted": "87.3%",
+        "numerator": "48.00",
+        "provenance": "restated",
+        "sample_size": 55,
+        "unit": "percent",
+        "value": "87.27"
+      },
+      "survey_response_rate": {
+        "denominator": "650.00",
+        "formatted": "45.7%",
+        "numerator": "297.00",
+        "provenance": "new",
+        "sample_size": 650,
+        "unit": "percent",
+        "value": "45.69"
+      },
+      "total_participants": {
+        "denominator": null,
+        "formatted": "287",
+        "numerator": null,
+        "provenance": "unchanged",
+        "sample_size": 1165,
+        "unit": "count",
+        "value": "287.00"
+      },
+      "total_programs": {
+        "denominator": null,
+        "formatted": "55",
+        "numerator": null,
+        "provenance": "restated",
+        "sample_size": 55,
+        "unit": "count",
+        "value": "55.00"
+      },
+      "training_days": {
+        "denominator": null,
+        "formatted": "119",
+        "numerator": null,
+        "provenance": "restated",
+        "sample_size": 119,
+        "unit": "count",
+        "value": "119.00"
+      },
+      "training_hours_delivered": {
+        "denominator": null,
+        "formatted": "365.2 hours",
+        "numerator": null,
+        "provenance": "restated",
+        "sample_size": 119,
+        "unit": "hours",
+        "value": "365.15"
+      },
+      "unique_reach": {
+        "denominator": null,
+        "formatted": "—",
+        "numerator": null,
+        "provenance": "new",
+        "sample_size": 0,
+        "unit": "count",
+        "value": null
+      }
+    },
+    "workbook_window": {
+      "activity_effectiveness": {
+        "denominator": "0.00",
+        "formatted": "—",
+        "numerator": "0.00",
+        "provenance": "corrected",
+        "sample_size": 0,
+        "unit": "percent",
+        "value": null
+      },
+      "blended_learner_hours": {
+        "denominator": null,
+        "formatted": "—",
+        "numerator": null,
+        "provenance": "new",
+        "sample_size": 0,
+        "unit": "hours",
+        "value": null
+      },
+      "coverage_gap": {
+        "denominator": null,
+        "formatted": "1,295",
+        "numerator": null,
+        "provenance": "new",
+        "sample_size": 1430,
+        "unit": "count",
+        "value": "1295.00"
+      },
+      "facilitator_performance": {
+        "denominator": "0.00",
+        "formatted": "—",
+        "numerator": "0.00",
+        "provenance": "unchanged",
+        "sample_size": 0,
+        "unit": "percent",
+        "value": null
+      },
+      "fill_rate": {
+        "denominator": "705.00",
+        "formatted": "68.4%",
+        "numerator": "482.00",
+        "provenance": "new",
+        "sample_size": 27,
+        "unit": "percent",
+        "value": "68.37"
+      },
+      "knowledge_relevance": {
+        "denominator": "0.00",
+        "formatted": "—",
+        "numerator": "0.00",
+        "provenance": "corrected",
+        "sample_size": 0,
+        "unit": "percent",
+        "value": null
+      },
+      "learner_hours": {
+        "denominator": null,
+        "formatted": "1,153.0 hours",
+        "numerator": null,
+        "provenance": "unchanged",
+        "sample_size": 437,
+        "unit": "hours",
+        "value": "1153.00"
+      },
+      "linkedin_hours": {
+        "denominator": null,
+        "formatted": "—",
+        "numerator": null,
+        "provenance": "new",
+        "sample_size": 0,
+        "unit": "hours",
+        "value": null
+      },
+      "lnd_delivered_share": {
+        "denominator": "27.00",
+        "formatted": "96.3%",
+        "numerator": "26.00",
+        "provenance": "renamed",
+        "sample_size": 27,
+        "unit": "percent",
+        "value": "96.30"
+      },
+      "logistics_effectiveness": {
+        "denominator": "0.00",
+        "formatted": "—",
+        "numerator": "0.00",
+        "provenance": "corrected",
+        "sample_size": 0,
+        "unit": "percent",
+        "value": null
+      },
+      "months_since_last_training": {
+        "denominator": null,
+        "formatted": "2.3 months",
+        "numerator": null,
+        "provenance": "new",
+        "sample_size": 147,
+        "unit": "months",
+        "value": "2.30"
+      },
+      "no_show_rate": {
+        "denominator": "482.00",
+        "formatted": "36.9%",
+        "numerator": "178.00",
+        "provenance": "new",
+        "sample_size": 482,
+        "unit": "percent",
+        "value": "36.93"
+      },
+      "nps": {
+        "denominator": "0.00",
+        "formatted": "—",
+        "numerator": "0.00",
+        "provenance": "corrected",
+        "sample_size": 0,
+        "unit": "nps",
+        "value": null
+      },
+      "participation_rate": {
+        "denominator": "1430.00",
+        "formatted": "9.4%",
+        "numerator": "135.00",
+        "provenance": "corrected",
+        "sample_size": 1430,
+        "unit": "percent",
+        "value": "9.44"
+      },
+      "public_program_share": {
+        "denominator": "27.00",
+        "formatted": "81.5%",
+        "numerator": "22.00",
+        "provenance": "restated",
+        "sample_size": 27,
+        "unit": "percent",
+        "value": "81.48"
+      },
+      "survey_response_rate": {
+        "denominator": "304.00",
+        "formatted": "38.8%",
+        "numerator": "118.00",
+        "provenance": "new",
+        "sample_size": 304,
+        "unit": "percent",
+        "value": "38.82"
+      },
+      "total_participants": {
+        "denominator": null,
+        "formatted": "147",
+        "numerator": null,
+        "provenance": "unchanged",
+        "sample_size": 437,
+        "unit": "count",
+        "value": "147.00"
+      },
+      "total_programs": {
+        "denominator": null,
+        "formatted": "27",
+        "numerator": null,
+        "provenance": "restated",
+        "sample_size": 27,
+        "unit": "count",
+        "value": "27.00"
+      },
+      "training_days": {
+        "denominator": null,
+        "formatted": "50",
+        "numerator": null,
+        "provenance": "restated",
+        "sample_size": 50,
+        "unit": "count",
+        "value": "50.00"
+      },
+      "training_hours_delivered": {
+        "denominator": null,
+        "formatted": "135.6 hours",
+        "numerator": null,
+        "provenance": "restated",
+        "sample_size": 50,
+        "unit": "hours",
+        "value": "135.65"
+      },
+      "unique_reach": {
+        "denominator": null,
+        "formatted": "—",
+        "numerator": null,
+        "provenance": "new",
+        "sample_size": 0,
+        "unit": "count",
+        "value": null
+      }
+    }
+  },
+  "per_month": {
+    "2025-07": {
+      "attendance": 11,
+      "sessions": 2
+    },
+    "2025-08": {
+      "attendance": 61,
+      "sessions": 5
+    },
+    "2025-09": {
+      "attendance": 161,
+      "sessions": 17
+    },
+    "2025-10": {
+      "attendance": 89,
+      "sessions": 12
+    },
+    "2025-11": {
+      "attendance": 263,
+      "sessions": 22
+    },
+    "2025-12": {
+      "attendance": 143,
+      "sessions": 10
+    },
+    "2026-01": {
+      "sessions": 1
+    },
+    "2026-02": {
+      "attendance": 17,
+      "sessions": 2
+    },
+    "2026-03": {
+      "attendance": 26,
+      "sessions": 3
+    },
+    "2026-04": {
+      "attendance": 43,
+      "sessions": 5
+    },
+    "2026-05": {
+      "attendance": 127,
+      "sessions": 12
+    },
+    "2026-06": {
+      "attendance": 92,
+      "sessions": 11
+    },
+    "2026-07": {
+      "attendance": 45,
+      "sessions": 9
+    },
+    "2026-08": {
+      "attendance": 87,
+      "sessions": 8
+    },
+    "2026-09": {
+      "sessions": 4
+    }
+  },
+  "per_program": {
+    "2": {
+      "attendance": 11,
+      "enrollments": 18,
+      "evaluations": 5,
+      "sessions": 2
+    },
+    "25": {
+      "attendance": 7,
+      "enrollments": 9,
+      "evaluations": 5,
+      "sessions": 1
+    },
+    "26": {
+      "attendance": 9,
+      "enrollments": 23,
+      "evaluations": 9,
+      "sessions": 1
+    },
+    "27": {
+      "attendance": 45,
+      "enrollments": 24,
+      "evaluations": 14,
+      "sessions": 3
+    },
+    "28": {
+      "attendance": 61,
+      "enrollments": 25,
+      "evaluations": 15,
+      "sessions": 4
+    },
+    "29": {
+      "attendance": 15,
+      "enrollments": 6,
+      "evaluations": 4,
+      "sessions": 3
+    },
+    "32": {
+      "attendance": 17,
+      "enrollments": 11,
+      "evaluations": 4,
+      "sessions": 3
+    },
+    "33": {
+      "attendance": 12,
+      "enrollments": 22,
+      "evaluations": 9,
+      "sessions": 1
+    },
+    "34": {
+      "attendance": 16,
+      "enrollments": 20,
+      "evaluations": 5,
+      "sessions": 3
+    },
+    "35": {
+      "attendance": 28,
+      "enrollments": 30,
+      "evaluations": 12,
+      "sessions": 4
+    },
+    "39": {
+      "attendance": 12,
+      "enrollments": 12,
+      "sessions": 1
+    },
+    "40": {
+      "attendance": 26,
+      "enrollments": 18,
+      "evaluations": 8,
+      "sessions": 3
+    },
+    "41": {
+      "enrollments": 5,
+      "sessions": 2
+    },
+    "42": {
+      "attendance": 17,
+      "enrollments": 44,
+      "evaluations": 8,
+      "sessions": 1
+    },
+    "43": {
+      "attendance": 46,
+      "enrollments": 21,
+      "evaluations": 12,
+      "sessions": 4
+    },
+    "44": {
+      "attendance": 16,
+      "enrollments": 32,
+      "evaluations": 7,
+      "sessions": 1
+    },
+    "45": {
+      "attendance": 19,
+      "enrollments": 19,
+      "evaluations": 4,
+      "sessions": 3
+    },
+    "47": {
+      "attendance": 84,
+      "enrollments": 22,
+      "evaluations": 14,
+      "sessions": 6
+    },
+    "48": {
+      "attendance": 69,
+      "enrollments": 22,
+      "evaluations": 10,
+      "sessions": 6
+    },
+    "49": {
+      "attendance": 35,
+      "enrollments": 27,
+      "evaluations": 1,
+      "sessions": 3
+    },
+    "50": {
+      "attendance": 36,
+      "enrollments": 29,
+      "evaluations": 6,
+      "sessions": 3
+    },
+    "54": {
+      "attendance": 4,
+      "enrollments": 4,
+      "sessions": 1
+    },
+    "55": {
+      "attendance": 16,
+      "enrollments": 33,
+      "sessions": 1
+    },
+    "56": {
+      "attendance": 59,
+      "enrollments": 30,
+      "evaluations": 7,
+      "sessions": 4
+    },
+    "57": {
+      "attendance": 16,
+      "enrollments": 18,
+      "sessions": 1
+    },
+    "58": {
+      "attendance": 39,
+      "enrollments": 21,
+      "evaluations": 17,
+      "sessions": 2
+    },
+    "59": {
+      "attendance": 13,
+      "enrollments": 13,
+      "evaluations": 3,
+      "sessions": 1
+    },
+    "61": {
+      "enrollments": 7,
+      "sessions": 1
+    },
+    "63": {
+      "attendance": 17,
+      "enrollments": 17,
+      "evaluations": 7,
+      "sessions": 2
+    },
+    "64": {
+      "attendance": 14,
+      "enrollments": 14,
+      "evaluations": 8,
+      "sessions": 2
+    },
+    "65": {
+      "attendance": 12,
+      "enrollments": 16,
+      "evaluations": 10,
+      "sessions": 1
+    },
+    "66": {
+      "attendance": 27,
+      "enrollments": 18,
+      "evaluations": 9,
+      "sessions": 2
+    },
+    "67": {
+      "enrollments": 2,
+      "sessions": 1
+    },
+    "68": {
+      "attendance": 16,
+      "enrollments": 23,
+      "sessions": 1
+    },
+    "70": {
+      "enrollments": 1,
+      "sessions": 1
+    },
+    "71": {
+      "attendance": 17,
+      "enrollments": 26,
+      "evaluations": 1,
+      "sessions": 1
+    },
+    "72": {
+      "attendance": 35,
+      "enrollments": 25,
+      "evaluations": 13,
+      "sessions": 2
+    },
+    "73": {
+      "attendance": 38,
+      "enrollments": 34,
+      "evaluations": 12,
+      "sessions": 2
+    },
+    "74": {
+      "enrollments": 2,
+      "sessions": 2
+    },
+    "75": {
+      "attendance": 17,
+      "enrollments": 20,
+      "sessions": 1
+    },
+    "76": {
+      "enrollments": 23,
+      "sessions": 1
+    },
+    "77": {
+      "attendance": 9,
+      "enrollments": 24,
+      "sessions": 1
+    },
+    "78": {
+      "attendance": 6,
+      "enrollments": 24,
+      "evaluations": 1,
+      "sessions": 1
+    },
+    "79": {
+      "attendance": 5,
+      "enrollments": 17,
+      "sessions": 1
+    },
+    "80": {
+      "attendance": 18,
+      "enrollments": 20,
+      "evaluations": 6,
+      "sessions": 2
+    },
+    "81": {
+      "attendance": 10,
+      "enrollments": 19,
+      "evaluations": 1,
+      "sessions": 3
+    },
+    "82": {
+      "attendance": 11,
+      "enrollments": 16,
+      "evaluations": 5,
+      "sessions": 1
+    },
+    "83": {
+      "attendance": 39,
+      "enrollments": 14,
+      "evaluations": 5,
+      "sessions": 4
+    },
+    "84": {
+      "attendance": 20,
+      "enrollments": 27,
+      "evaluations": 18,
+      "sessions": 2
+    },
+    "85": {
+      "attendance": 24,
+      "enrollments": 29,
+      "sessions": 4
+    },
+    "87": {
+      "attendance": 39,
+      "enrollments": 22,
+      "evaluations": 11,
+      "sessions": 3
+    },
+    "88": {
+      "attendance": 2,
+      "enrollments": 8,
+      "sessions": 2
+    },
+    "89": {
+      "attendance": 13,
+      "enrollments": 16,
+      "sessions": 2
+    },
+    "90": {
+      "attendance": 37,
+      "enrollments": 19,
+      "evaluations": 7,
+      "sessions": 3
+    },
+    "91": {
+      "attendance": 11,
+      "enrollments": 6,
+      "evaluations": 4,
+      "sessions": 2
+    },
+    "92": {
+      "enrollments": 10,
+      "sessions": 1
+    },
+    "93": {
+      "enrollments": 3,
+      "sessions": 3
+    }
+  },
+  "totals": {
+    "attendance": 1165,
+    "distinct_attendees": 287,
+    "employee_versions": 1578,
+    "employees": 1578,
+    "enrollments": 1060,
+    "evaluations": 297,
+    "learner_hours": "3686.50",
+    "programs": 57,
+    "programs_completed": 55,
+    "programs_status_says_completed": 0,
+    "sessions": 123,
+    "trainers": 15,
+    "training_hours_delivered": "374.15"
+  }
+}
