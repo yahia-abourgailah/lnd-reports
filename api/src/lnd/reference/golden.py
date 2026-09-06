@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,8 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from lnd.config import get_settings
+from lnd.db import dispose_engine
 from lnd.models.core import (
     DimEmployee,
     DimProgram,
@@ -406,8 +409,22 @@ def main(argv: list[str] | None = None) -> int:
         "--database-url",
         help="a scratch database to load the frozen dataset into (defaults to DATABASE_URL)",
     )
-    parser.parse_args(argv)
+    args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    # The flag was accepted and then ignored, so every run went to DATABASE_URL
+    # whatever was asked for. That is the one mistake this flag exists to
+    # prevent: replay lands the frozen payloads and transforms them, so pointed
+    # at a database that already holds facts it doubles every grain — 1,060
+    # enrollments become 2,120 — and the golden file records the doubled
+    # figures as the values nothing may move from.
+    #
+    # The transform invariant caught it rather than the file being written, but
+    # that was luck about ordering, not a guarantee.
+    if args.database_url:
+        os.environ["DATABASE_URL"] = args.database_url
+        get_settings.cache_clear()
+        dispose_engine()
 
     from lnd.db import session_scope
     from lnd.reference.replay import replay

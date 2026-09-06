@@ -33,11 +33,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from lnd.db import session_scope
 from lnd.ingest.landing import current
 from lnd.ingest.models import Entity, Source
+from lnd.models.app_ import SurveyQuestionMap
 from lnd.reference.anonymise import (
     KEY,
     anonymise_program,
@@ -163,6 +165,33 @@ def build(session: Session) -> dict[str, Any]:
     programs.sort(key=lambda program: program.get("id") or 0)
     roster.sort(key=lambda user: str(user.get("odoo_id") or ""))
 
+    # The `app` overlay is an input to the transform exactly as `raw` is. A
+    # dataset that froze only the payloads is not reproducible: the survey
+    # question map decides which question is which metric, so a replay without
+    # it scores every answer null and pins NPS and the four quality scores at
+    # "no value" — which is what happened, and which looks indistinguishable
+    # from a platform nobody has surveyed.
+    #
+    # Carried as authored rows rather than as a migration reference, because
+    # week 6 hands this table to L&D: once they edit it, the mapping that
+    # produced a given set of golden values is a fact about that moment and
+    # belongs in the frozen file beside the payloads it applies to.
+    survey_questions = [
+        {
+            "crm_survey_id": row.crm_survey_id,
+            "crm_question_id": row.crm_question_id,
+            "question_title": row.question_title,
+            "dimension": str(row.dimension),
+            "scale_min": row.scale_min,
+            "scale_max": row.scale_max,
+        }
+        for row in session.scalars(
+            select(SurveyQuestionMap)
+            .where(SurveyQuestionMap.superseded_at.is_(None))
+            .order_by(SurveyQuestionMap.crm_survey_id, SurveyQuestionMap.crm_question_id)
+        )
+    ]
+
     dataset = {
         "meta": {
             "note": (
@@ -174,9 +203,11 @@ def build(session: Session) -> dict[str, Any]:
             "frozen_at": datetime.now(UTC).date().isoformat(),
             "programs": len(programs),
             "roster": len(roster),
+            "survey_questions": len(survey_questions),
         },
         "programs": programs,
         "roster": roster,
+        "survey_questions": survey_questions,
     }
 
     _assert_no_leak(raw_programs + raw_roster, dataset)

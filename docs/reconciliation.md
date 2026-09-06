@@ -32,7 +32,7 @@ The platform computes these the way the workbook did. Where the number still dif
 |---|---|---|---|
 | Total Participants | 128 | **147** | 437 |
 | Learner Hours | 1,386.0 hours | **1,153.0 hours** | 437 |
-| Facilitator Performance | 100.0% | **—** | — |
+| Facilitator Performance | 100.0% | **98.3%** | 118 |
 
 
 **Total Participants** — Distinct people with at least one attendance in scope.
@@ -52,7 +52,6 @@ The platform computes these the way the workbook did. Where the number still dif
 *Counts over:* survey responses carrying a rating for the dimension asked about.
 *Excludes:* records soft-deleted at source by the nightly reconcile; rows whose person could not be identified — quarantined, never dropped; responses that left this question blank.
 *Workbook figure from BRD v1.5.*
-*Not computable yet.* No value is produced for this metric on the current data — see **What is still blocked** below.
 
 ### Restated
 
@@ -114,11 +113,11 @@ The published figure was wrong. These are the difficult conversations, and each 
 
 | Metric | Workbook | Platform | n |
 |---|---|---|---|
-| Knowledge Relevance | 100.0% | **—** | — |
-| Activity Effectiveness | 98.2% | **—** | — |
-| Logistics Effectiveness | 96.4% | **—** | — |
-| Net Promoter Score | 92.7% | **—** | — |
-| Participation Rate | 60.4% | **9.4%** | 1,430 |
+| Knowledge Relevance | 100.0% | **97.5%** | 118 |
+| Activity Effectiveness | 98.2% | **97.5%** | 118 |
+| Logistics Effectiveness | 96.4% | **91.5%** | 118 |
+| Net Promoter Score | 92.7% | **+83.1** | 118 |
+| Participation Rate | 60.4% | **9.3%** | 1,455 |
 
 
 **Knowledge Relevance** — Share of responses rating this knowledge as relevant 4 or better on the 1-5 scale, over every response in scope that answered the question.
@@ -127,7 +126,6 @@ The published figure was wrong. These are the difficult conversations, and each 
 *Excludes:* records soft-deleted at source by the nightly reconcile; rows whose person could not be identified — quarantined, never dropped; responses that left this question blank.
 *Why it changed:* Formula unchanged. The workbook computed it over a silently filtered 55 of 77 responses; this runs over every response in the declared population (P-03).
 *Workbook figure from BRD v1.5.*
-*Not computable yet.* No value is produced for this metric on the current data — see **What is still blocked** below.
 
 **Activity Effectiveness** — Share of responses rating this activity as effective 4 or better on the 1-5 scale, over every response in scope that answered the question.
 
@@ -135,7 +133,6 @@ The published figure was wrong. These are the difficult conversations, and each 
 *Excludes:* records soft-deleted at source by the nightly reconcile; rows whose person could not be identified — quarantined, never dropped; responses that left this question blank.
 *Why it changed:* Formula unchanged. The workbook computed it over a silently filtered 55 of 77 responses; this runs over every response in the declared population (P-03).
 *Workbook figure from BRD v1.5.*
-*Not computable yet.* No value is produced for this metric on the current data — see **What is still blocked** below.
 
 **Logistics Effectiveness** — Share of responses rating this logistics as effective 4 or better on the 1-5 scale, over every response in scope that answered the question.
 
@@ -143,7 +140,6 @@ The published figure was wrong. These are the difficult conversations, and each 
 *Excludes:* records soft-deleted at source by the nightly reconcile; rows whose person could not be identified — quarantined, never dropped; responses that left this question blank.
 *Why it changed:* Formula unchanged. The workbook computed it over a silently filtered 55 of 77 responses; this runs over every response in the declared population (P-03).
 *Workbook figure from BRD v1.5.*
-*Not computable yet.* No value is produced for this metric on the current data — see **What is still blocked** below.
 
 **Net Promoter Score** — (promoters - detractors) / responses, on the standard -100 to +100 scale. Promoters score 9-10, passives 7-8, detractors 0-6.
 
@@ -151,7 +147,6 @@ The published figure was wrong. These are the difficult conversations, and each 
 *Excludes:* records soft-deleted at source by the nightly reconcile; rows whose person could not be identified — quarantined, never dropped; responses that left this question blank.
 *Why it changed:* Two changes. Scope: over every response rather than a filtered 55 of 77 (P-03). Unit: the workbook's 92.7% was a percentage; NPS is a -100..+100 index. The two are not comparable and must not be shown as if they were.
 *Workbook figure from BRD v1.5 — published as a percentage; NPS is an index.*
-*Not computable yet.* No value is produced for this metric on the current data — see **What is still blocked** below.
 
 **Participation Rate** — Distinct people who attended at least one session in the period, over active employees the CRM can enroll as at the period end.
 
@@ -169,7 +164,7 @@ The workbook had no equivalent. Nothing to reconcile — but each needs its defi
 | No-show Rate | — | **36.9%** | 482 |
 | Fill Rate | — | **68.4%** | 27 |
 | Survey Response Rate | — | **38.8%** | 304 |
-| Coverage Gap | — | **1,295** | 1,430 |
+| Coverage Gap | — | **1,320** | 1,455 |
 | Months Since Last Training | — | **2.3 months** | 147 |
 | LinkedIn Hours | — | **—** | — |
 | Blended Learner Hours | — | **—** | — |
@@ -230,25 +225,25 @@ The workbook had no equivalent. Nothing to reconcile — but each needs its defi
 
 July 2025 to September 2026. **Not comparable to the workbook column** — it covers roughly twice the period. This is what the platform will publish once it is live.
 
-| Metric | Feb–Aug 2026 | Full dataset | n (full) |
+| Metric | Feb-Aug 2026 | Full dataset | n (full) |
 |---|---|---|---|
 | Total Participants | 147 | 287 | 1,165 |
 | Learner Hours | 1,153.0 hours | 3,686.5 hours | 1,165 |
-| Facilitator Performance | — | — | — |
+| Facilitator Performance | 98.3% | 98.7% | 297 |
 | Training Days | 50 | 119 | 119 |
 | Training Hours Delivered | 135.6 hours | 365.2 hours | 119 |
 | Total Programs | 27 | 55 | 55 |
 | L&D-delivered % | 96.3% | 89.1% | 55 |
 | Public vs Customised | 81.5% | 87.3% | 55 |
-| Knowledge Relevance | — | — | — |
-| Activity Effectiveness | — | — | — |
-| Logistics Effectiveness | — | — | — |
-| Net Promoter Score | — | — | — |
-| Participation Rate | 9.4% | 14.1% | 1,430 |
+| Knowledge Relevance | 97.5% | 97.6% | 297 |
+| Activity Effectiveness | 97.5% | 98.0% | 297 |
+| Logistics Effectiveness | 91.5% | 91.9% | 297 |
+| Net Promoter Score | +83.1 | +88.2 | 297 |
+| Participation Rate | 9.3% | 13.8% | 1,455 |
 | No-show Rate | 36.9% | 38.7% | 1,060 |
 | Fill Rate | 68.4% | 70.9% | 55 |
 | Survey Response Rate | 38.8% | 45.7% | 650 |
-| Coverage Gap | 1,295 | 1,229 | 1,430 |
+| Coverage Gap | 1,320 | 1,254 | 1,455 |
 | Months Since Last Training | 2.3 months | 4.9 months | 287 |
 | LinkedIn Hours | — | — | — |
 | Blended Learner Hours | — | — | — |
@@ -258,18 +253,13 @@ July 2025 to September 2026. **Not comparable to the workbook column** — it co
 
 These metrics produce no value on the current data:
 
-- **Activity Effectiveness**
 - **Blended Learner Hours**
-- **Facilitator Performance**
-- **Knowledge Relevance**
 - **LinkedIn Hours**
-- **Logistics Effectiveness**
-- **Net Promoter Score**
 - **Unique Reach**
 
 The five quality metrics and NPS are blocked on one thing: `app.survey_question_map` is empty, so no answer can be attributed to a measured dimension. All survey responses are stored; none are scored. The CRM runs a single shared survey whose questions are stable across every program — q3 knowledge, q4 activity, q5 logistics, q6 facilitator, q7 recommend — so the map is five rows, and until it exists the stakeholder gate cannot be held on the figures L&D most wants to see.
 
-LinkedIn Hours, Blended Learner Hours and Unique Reach have no source connected. They are scheduled for weeks 7–8 and are first to be cut.
+LinkedIn Hours, Blended Learner Hours and Unique Reach have no source connected. They are scheduled for weeks 7-8 and are first to be cut.
 
 ## The conversations that need care
 
@@ -277,15 +267,15 @@ LinkedIn Hours, Blended Learner Hours and Unique Reach have no source connected.
 
 It was wrong twice over. The denominator was the literal number 192 typed into a formula (P-01), and it then divided five companies' attendance by one company's headcount (P-13). Both halves now come from the same roster.
 
-Over the workbook's window it reads **9.4%** — 135 people who attended, over 1,430 active employees the CRM can enroll.
+Over the workbook's window it reads **9.3%** — 135 people who attended, over 1,455 active employees the CRM can enroll.
 
 The old 60.4% and 66.7% are not larger versions of this number. They are a different measurement, and presenting them side by side invites the reading that participation collapsed. It did not: it was never measured.
 
 ### NPS: two changes, and only one is a correction
 
-The scope was wrong — the published figure ran over a silently filtered 55 of 77 responses (P-03). But the **unit** was also wrong: 92.7% is a percentage, and NPS is an index from −100 to +100.
+The scope was wrong — the published figure ran over a silently filtered 55 of 77 responses (P-03). But the **unit** was also wrong: 92.7% is a percentage, and NPS is an index from -100 to +100.
 
-Shown without explanation, an NPS of +88 reads as a fall from 92.7. It is not, and nothing about satisfaction changed. Say: *NPS is now reported on the standard −100 to +100 scale.* Then give the number.
+Shown without explanation, an NPS of +88 reads as a fall from 92.7. It is not, and nothing about satisfaction changed. Say: *NPS is now reported on the standard -100 to +100 scale.* Then give the number.
 
 ### Learner Hours is lower than the workbook, and that needs an answer
 

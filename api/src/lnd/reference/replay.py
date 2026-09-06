@@ -18,14 +18,45 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from lnd.ingest.landing import land
 from lnd.ingest.models import Entity, Source
+from lnd.models.app_ import SurveyQuestionMap
+from lnd.models.core import EvaluationDimension
 from lnd.reference.freeze import load as load_dataset
 from lnd.transform.runner import TransformResult, transform_programs
 
 log = logging.getLogger(__name__)
+
+
+def _restore_survey_questions(session: Session, rows: list[dict[str, Any]]) -> None:
+    """Put the frozen `app.survey_question_map` back, if it is not already there."""
+    if not rows:
+        return
+    existing = set(
+        session.scalars(
+            select(SurveyQuestionMap.crm_question_id).where(
+                SurveyQuestionMap.superseded_at.is_(None)
+            )
+        )
+    )
+    for row in rows:
+        if row["crm_question_id"] in existing:
+            continue
+        session.add(
+            SurveyQuestionMap(
+                crm_survey_id=row["crm_survey_id"],
+                crm_question_id=row["crm_question_id"],
+                question_title=row.get("question_title"),
+                dimension=EvaluationDimension(row["dimension"]),
+                scale_min=row["scale_min"],
+                scale_max=row["scale_max"],
+                authored_by="reference-dataset",
+            )
+        )
+    session.flush()
 
 
 def replay(session: Session, dataset: dict[str, Any] | None = None) -> TransformResult:
@@ -52,6 +83,16 @@ def replay(session: Session, dataset: dict[str, Any] | None = None) -> Transform
         entity=Entity.EMPLOYEE,
         records=[(str(user["odoo_id"]), user) for user in data["roster"]],
     )
+
+    # The overlay before the transform that consults it. Without the question
+    # map every answer scores null, and NPS plus the four quality scores pin at
+    # "no value" — the replay silently measuring a different pipeline from the
+    # one production runs.
+    #
+    # Restored rather than assumed present: the test fixtures truncate `app`
+    # between tests, and a replay that depended on migration 0009's rows
+    # surviving that would pass or fail on fixture ordering.
+    _restore_survey_questions(session, data.get("survey_questions") or [])
 
     result = transform_programs(session)
     log.info(

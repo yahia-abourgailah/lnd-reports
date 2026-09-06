@@ -195,29 +195,46 @@ class TestTheMetricsHaveNotMoved:
             f"{sorted(registered - pinned)}. Run `python -m lnd.reference.golden`."
         )
 
-    def test_the_blocked_metrics_are_blocked_for_a_stated_reason(
-        self, computed: dict[str, Any]
-    ) -> None:
-        """Six metrics return nothing today, and it must stay deliberate.
+    def test_only_the_metrics_with_no_source_return_nothing(self, computed: dict[str, Any]) -> None:
+        """Three metrics return nothing, and it must stay exactly three.
 
-        Five quality scores and NPS are blocked on `app.survey_question_map`
-        being empty; the three LinkedIn metrics have no source connected. A
-        metric that started producing a number without anybody authoring that
-        map would mean it had begun guessing, which is worse than returning
-        nothing.
+        The LinkedIn export is not connected, so those three have had no
+        measurement — which is not a measurement of none, and they report no
+        value rather than zero. If one of them starts producing a number
+        without a feed being wired up, it has begun guessing.
+
+        This previously asserted that the survey metrics were blocked too,
+        because `app.survey_question_map` was empty when the dataset was first
+        frozen. That was the gap being pinned rather than the guarantee: an
+        empty map does not error, it returns null everywhere and looks exactly
+        like a platform nobody has surveyed — so a golden file recording those
+        nulls let any change to NPS or a quality score pass CI silently. The
+        map is now frozen alongside the payloads, and the assertion below is
+        the one worth keeping.
         """
         values = computed["metrics"]["full_dataset"]
         undefined = {key for key, v in values.items() if v["value"] is None}
-        assert undefined == {
+
+        assert undefined == {"linkedin_hours", "blended_learner_hours", "unique_reach"}
+
+    def test_every_survey_metric_rests_on_real_responses(self, computed: dict[str, Any]) -> None:
+        """The five figures the CI gate could not previously protect.
+
+        A sample size of zero is what an unseeded question map produces, and it
+        is indistinguishable on screen from a survey nobody answered. Asserting
+        the sample rather than only the value is what makes that state fail.
+        """
+        values = computed["metrics"]["full_dataset"]
+
+        for key in (
             "knowledge_relevance",
             "activity_effectiveness",
             "logistics_effectiveness",
             "facilitator_performance",
             "nps",
-            "linkedin_hours",
-            "blended_learner_hours",
-            "unique_reach",
-        }
+        ):
+            assert values[key]["value"] is not None, f"{key} has no value"
+            assert values[key]["sample_size"] > 0, f"{key} rests on no responses"
 
 
 class TestHistory:

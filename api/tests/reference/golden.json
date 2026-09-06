@@ -4,26 +4,26 @@
       "Eclatic Cosmetics": 14,
       "The Address Developments": 13,
       "The Address Holding": 10,
-      "The Address Investments": 1318,
+      "The Address Investments": 1343,
       "The MarQ Communities": 223
     },
     "employees_by_job_level": {
-      "(none)": 95,
+      "(none)": 96,
       "Associate Director": 22,
-      "Associate Manager": 121,
+      "Associate Manager": 122,
       "CEOs -Board Member": 5,
       "Chief Officer": 5,
       "Clerk-Worker Supervisor": 15,
       "Director": 30,
       "Freelancer": 20,
       "Head": 16,
-      "Junior Specialist - Worker Senior supervisor": 322,
-      "Manager": 116,
+      "Junior Specialist - Worker Senior supervisor": 337,
+      "Manager": 117,
       "Section Head": 72,
       "Senior Director": 36,
       "Senior Manager": 43,
-      "Senior Specialist": 229,
-      "Specialist": 248,
+      "Senior Specialist": 232,
+      "Specialist": 252,
       "Supervisor": 72,
       "Teamleader": 54,
       "Worker A": 4,
@@ -32,14 +32,14 @@
     },
     "employees_by_roster_status": {
       "False": 148,
-      "True": 1430
+      "True": 1455
     },
     "employees_by_sector": {
       "Business Development": 5,
       "Business Operations": 1,
       "Business Relations": 43,
       "CEO Office": 11,
-      "Commercial": 990,
+      "Commercial": 1015,
       "Commercial & Strategy": 50,
       "Commercial Eclatic": 7,
       "Communities & Clients Excellence": 57,
@@ -88,7 +88,6 @@
   },
   "exceptions": {
     "capacity_exceeded": 1,
-    "survey_question_unmapped": 5,
     "trainer_missing": 2
   },
   "history": {
@@ -115,13 +114,13 @@
   "metrics": {
     "full_dataset": {
       "activity_effectiveness": {
-        "denominator": "0.00",
-        "formatted": "—",
-        "numerator": "0.00",
+        "denominator": "297.00",
+        "formatted": "98.0%",
+        "numerator": "291.00",
         "provenance": "corrected",
-        "sample_size": 0,
+        "sample_size": 297,
         "unit": "percent",
-        "value": null
+        "value": "97.98"
       },
       "blended_learner_hours": {
         "denominator": null,
@@ -134,21 +133,21 @@
       },
       "coverage_gap": {
         "denominator": null,
-        "formatted": "1,229",
+        "formatted": "1,254",
         "numerator": null,
         "provenance": "new",
-        "sample_size": 1430,
+        "sample_size": 1455,
         "unit": "count",
-        "value": "1229.00"
+        "value": "1254.00"
       },
       "facilitator_performance": {
-        "denominator": "0.00",
-        "formatted": "—",
-        "numerator": "0.00",
+        "denominator": "297.00",
+        "formatted": "98.7%",
+        "numerator": "293.00",
         "provenance": "unchanged",
-        "sample_size": 0,
+        "sample_size": 297,
         "unit": "percent",
-        "value": null
+        "value": "98.65"
       },
       "fill_rate": {
         "denominator": "1476.00",
@@ -160,13 +159,13 @@
         "value": "70.93"
       },
       "knowledge_relevance": {
-        "denominator": "0.00",
-        "formatted": "—",
-        "numerator": "0.00",
+        "denominator": "297.00",
+        "formatted": "97.6%",
+        "numerator": "290.00",
         "provenance": "corrected",
-        "sample_size": 0,
+        "sample_size": 297,
         "unit": "percent",
-        "value": null
+        "value": "97.64"
       },
       "learner_hours": {
         "denominator": null,
@@ -196,13 +195,13 @@
         "value": "89.09"
       },
       "logistics_effectiveness": {
-        "denominator": "0.00",
-        "formatted": "—",
-        "numerator": "0.00",
+        "denominator": "297.00",
+        "formatted": "91.9%",
+        "numerator": "273.00",
         "provenance": "corrected",
-        "sample_size": 0,
+        "sample_size": 297,
         "unit": "percent",
-        "value": null
+        "value": "91.92"
       },
       "months_since_last_training": {
         "denominator": null,
@@ -223,22 +222,22 @@
         "value": "38.68"
       },
       "nps": {
-        "denominator": "0.00",
-        "formatted": "—",
-        "numerator": "0.00",
+        "denominator": "297.00",
+        "formatted": "+88.2",
+        "numerator": "262.00",
         "provenance": "corrected",
-        "sample_size": 0,
+        "sample_size": 297,
         "unit": "nps",
-        "value": null
+        "value": "88.22"
       },
       "participation_rate": {
-        "denominator": "1430.00",
-        "formatted": "14.1%",
+        "denominator": "1455.00",
+        "formatted": "13.8%",
         "numerator": "201.00",
         "provenance": "corrected",
-        "sample_size": 1430,
+        "sample_size": 1455,
         "unit": "percent",
-        "value": "14.06"
+        "value": "13.81"
       },
       "public_program_share": {
         "denominator": "55.00",
@@ -306,13 +305,13 @@
     },
     "workbook_window": {
       "activity_effectiveness": {
-        "denominator": "0.00",
-        "formatted": "—",
-        "numerator": "0.00",
+        "denominator": "118.00",
+        "formatted": "97.5%",
+        "numerator": "115.00",
         "provenance": "corrected",
-        "sample_size": 0,
+        "sample_size": 118,
         "unit": "percent",
-        "value": null
+        "value": "97.46"
       },
       "blended_learner_hours": {
         "denominator": null,
@@ -325,21 +324,21 @@
       },
       "coverage_gap": {
         "denominator": null,
-        "formatted": "1,295",
+        "formatted": "1,320",
         "numerator": null,
         "provenance": "new",
-        "sample_size": 1430,
+        "sample_size": 1455,
         "unit": "count",
-        "value": "1295.00"
+        "value": "1320.00"
       },
       "facilitator_performance": {
-        "denominator": "0.00",
-        "formatted": "—",
-        "numerator": "0.00",
+        "denominator": "118.00",
+        "formatted": "98.3%",
+        "numerator": "116.00",
         "provenance": "unchanged",
-        "sample_size": 0,
+        "sample_size": 118,
         "unit": "percent",
-        "value": null
+        "value": "98.31"
       },
       "fill_rate": {
         "denominator": "705.00",
@@ -351,13 +350,13 @@
         "value": "68.37"
       },
       "knowledge_relevance": {
-        "denominator": "0.00",
-        "formatted": "—",
-        "numerator": "0.00",
+        "denominator": "118.00",
+        "formatted": "97.5%",
+        "numerator": "115.00",
         "provenance": "corrected",
-        "sample_size": 0,
+        "sample_size": 118,
         "unit": "percent",
-        "value": null
+        "value": "97.46"
       },
       "learner_hours": {
         "denominator": null,
@@ -387,13 +386,13 @@
         "value": "96.30"
       },
       "logistics_effectiveness": {
-        "denominator": "0.00",
-        "formatted": "—",
-        "numerator": "0.00",
+        "denominator": "118.00",
+        "formatted": "91.5%",
+        "numerator": "108.00",
         "provenance": "corrected",
-        "sample_size": 0,
+        "sample_size": 118,
         "unit": "percent",
-        "value": null
+        "value": "91.53"
       },
       "months_since_last_training": {
         "denominator": null,
@@ -414,22 +413,22 @@
         "value": "36.93"
       },
       "nps": {
-        "denominator": "0.00",
-        "formatted": "—",
-        "numerator": "0.00",
+        "denominator": "118.00",
+        "formatted": "+83.1",
+        "numerator": "98.00",
         "provenance": "corrected",
-        "sample_size": 0,
+        "sample_size": 118,
         "unit": "nps",
-        "value": null
+        "value": "83.05"
       },
       "participation_rate": {
-        "denominator": "1430.00",
-        "formatted": "9.4%",
+        "denominator": "1455.00",
+        "formatted": "9.3%",
         "numerator": "135.00",
         "provenance": "corrected",
-        "sample_size": 1430,
+        "sample_size": 1455,
         "unit": "percent",
-        "value": "9.44"
+        "value": "9.28"
       },
       "public_program_share": {
         "denominator": "27.00",
@@ -876,8 +875,8 @@
   "totals": {
     "attendance": 1165,
     "distinct_attendees": 287,
-    "employee_versions": 1578,
-    "employees": 1578,
+    "employee_versions": 1603,
+    "employees": 1603,
     "enrollments": 1060,
     "evaluations": 297,
     "learner_hours": "3686.50",
