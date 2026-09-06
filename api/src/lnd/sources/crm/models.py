@@ -491,3 +491,61 @@ class ProgramsPage(CrmModel):
 
     programs: list[Program] = Field(default_factory=list)
     meta: PageMeta
+
+
+class Franchise(CrmModel):
+    """A branch or franchise under a company. New with the roster endpoint."""
+
+    id: int
+    odoo_id: str | None = None
+    name: str | None = None
+    code: str | None = None
+
+
+class Employee(CrmModel):
+    """One person from the roster endpoint.
+
+    Distinct from `User`, which is the summary embedded in a program payload.
+    This is the authoritative record: it exists for people who have never
+    attended anything, which is precisely the population participation rate's
+    denominator and the coverage report need, and which `/programs` cannot see.
+
+    The API document is explicit that this roster, not the embedded summary, is
+    the source of truth for org attributes — it is the one being refreshed.
+    """
+
+    id: int
+    #: The join key against `user_odoo_id` everywhere in the program payload.
+    #: A string in both payloads; compare as strings, never as integers.
+    odoo_id: str
+    name: str | None = None
+    employee_code: str | None = None
+    status: str | None = None
+
+    department: Department | None = None
+    company: Company | None = None
+    franchise: Franchise | None = None
+    #: Derived by the CRM from the department's Odoo path, and trimmed at
+    #: source — so unlike the embedded summary this one never arrives as
+    #: "Commercial " (P-05). Still conformed on ingest, because the embedded
+    #: copy is not.
+    sector: str | None = None
+    job_level_name: str | None = None
+    #: Text in both payloads, and the two do not agree on format: the roster
+    #: documents "G7" while the program summary sends "9". Kept as text here
+    #: rather than coerced, so the transform can see what actually arrived and
+    #: decide once. Ordering by seniority needs the numeric part.
+    job_level_grade: str | None = None
+
+    @field_validator("odoo_id", mode="before")
+    @classmethod
+    def _stringify(cls, value: Any) -> Any:
+        return str(value) if isinstance(value, int) else value
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == "active"
+
+    @property
+    def sector_conformed(self) -> str | None:
+        return self.sector.strip() if self.sector else None

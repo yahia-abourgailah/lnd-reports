@@ -103,6 +103,7 @@ class TestCatalogue:
             Entity.ENROLLMENT,
             Entity.ATTENDANCE,
             Entity.EVALUATION,
+            Entity.EMPLOYEE,
         ]
 
 
@@ -179,18 +180,38 @@ class TestLastAttempt:
 
 class TestRollup:
     def test_a_source_takes_the_worst_status_among_its_entities(self, live_db: None) -> None:
-        for entity in (Entity.PROGRAM, Entity.SESSION, Entity.ENROLLMENT, Entity.EVALUATION):
-            _add_run(entity=entity, finished_ago=timedelta(minutes=5))
+        """One late entity makes the whole source late.
+
+        Every declared pair is synced, so nothing is `never_synced` and the only
+        thing separating them is age — which is the point: a source with five
+        fresh entities and one stale one is stale, not four-fifths ok.
+        """
+        for source, entity in EXPECTED_ENTITIES:
+            if entity is Entity.ATTENDANCE:
+                continue
+            _add_run(source=source, entity=entity, finished_ago=timedelta(minutes=5))
         _add_run(entity=Entity.ATTENDANCE, finished_ago=timedelta(hours=4))
-        _add_run(source=HRIS, entity=Entity.EMPLOYEE, finished_ago=timedelta(minutes=5))
 
         report = _report()
         crm = next(source for source in report.sources if source.source is CRM)
-        hris = next(source for source in report.sources if source.source is HRIS)
 
         assert crm.status == "stale"
-        assert hris.status == "ok"
         assert report.status == "stale"
+
+    def test_a_source_outside_the_catalogue_rolls_up_on_its_own(self, live_db: None) -> None:
+        """The observed half of the union, at source level.
+
+        The HRIS is no longer a declared source — the CRM's own roster replaced
+        it — but it is still a valid value on `sync_run`. If one ever appeared,
+        it must be reported under its own heading rather than folded into the
+        CRM or dropped.
+        """
+        _add_run(source=HRIS, entity=Entity.EMPLOYEE, finished_ago=timedelta(minutes=5))
+
+        report = _report()
+        hris = next(source for source in report.sources if source.source is HRIS)
+
+        assert hris.status == "ok"
 
     def test_a_source_reports_the_worst_lag_among_its_entities(self, live_db: None) -> None:
         _add_run(entity=Entity.PROGRAM, finished_ago=timedelta(minutes=5))
@@ -222,7 +243,7 @@ class TestEndpoint:
 
         body = response.json()
         assert body["stale_after_seconds"] > 0
-        assert {source["source"] for source in body["sources"]} >= {"crm", "hris"}
+        assert {source["source"] for source in body["sources"]} == {"crm"}
 
     def test_a_stale_platform_still_answers_200(
         self, live_db: None, dev_bypass_client: TestClient

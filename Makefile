@@ -29,8 +29,23 @@ p.write_text(t)" && \
 	}
 	@touch $@
 
+# .env is never overwritten once it exists — that is what protects your CRM key
+# and the generated passwords — so it drifts from the template every time a
+# setting is added. Compose supplies a default for each, so drift is a warning
+# and not an error, but it should be visible rather than discovered later.
+.PHONY: env-check
+env-check: .env ## Report settings the template has and your .env does not
+	@missing=$$(comm -13 <(grep -oE '^[A-Z][A-Z0-9_]*=' .env | sort) \
+	                     <(grep -oE '^[A-Z][A-Z0-9_]*=' .env.example | sort) | tr -d '='); \
+	 if [ -n "$$missing" ]; then \
+	   echo "  .env is missing settings the template has — compose defaults apply:"; \
+	   echo "$$missing" | sed 's/^/    /'; \
+	   echo "  copy them across from .env.example if you need to change them."; \
+	 fi
+
 .PHONY: up
 up: .env ## Start the full stack in dev (http://localhost:8080)
+	@$(MAKE) --no-print-directory env-check
 	docker compose $(DEV) up --build -d
 	@$(MAKE) --no-print-directory migrate
 	@echo "→ http://localhost:8080   ·   pgAdmin http://127.0.0.1:8082   ·   API docs /v1/docs"
@@ -81,19 +96,50 @@ downgrade: ## Roll back one migration
 # ------------------------------------------------------------------ checks
 .PHONY: lint
 lint: ## ruff check + format check
-	cd api && ruff check . && ruff format --check .
+	cd api && $(BIN)ruff check . && $(BIN)ruff format --check .
+
+# ruff, mypy and pytest are not in the runtime image by design, so they come
+# from a local virtualenv. Prefer ./.venv if it exists — otherwise a machine
+# with a system python that merely *has* a `pytest` on PATH runs the tests
+# against the wrong interpreter and they fail on a missing dependency rather
+# than on anything real. VENV=/some/other/venv overrides.
+VENV ?= $(CURDIR)/.venv
+BIN  := $(if $(wildcard $(VENV)/bin/python),$(VENV)/bin/,)
 
 .PHONY: fmt
 fmt: ## ruff format
-	cd api && ruff format . && ruff check --fix .
+	cd api && $(BIN)ruff format . && $(BIN)ruff check --fix .
 
 .PHONY: types
 types: ## mypy
-	cd api && mypy src
+	cd api && $(BIN)mypy src
+
+# Tests get their own database, never the dev one. Several of them assert on
+# the whole contents of ops.sync_run — "the newest success wins", "a healthy
+# platform raises nothing" — which is only true of an empty schema. Pointed at
+# the dev database, every real sync ever run leaks in as fixture data and dozens
+# fail for reasons that have nothing to do with the code. Truncating the dev
+# database instead would work exactly once, and throw away its history to do it.
+#
+# Best effort: with no stack running, the URL simply points at nothing and the
+# database tests skip, which is what `pytest` on its own already does.
+.PHONY: test-db
+test-db: ## Create and migrate the throwaway test database
+	@u=$$(grep -E '^POSTGRES_USER=' .env | cut -d= -f2); \
+	 p=$$(grep -E '^POSTGRES_PASSWORD=' .env | cut -d= -f2); \
+	 d=$$(grep -E '^POSTGRES_DB=' .env | cut -d= -f2)_test; \
+	 docker compose $(DEV) exec -T db psql -U $$u -d postgres -tAc \
+	   "SELECT 1 FROM pg_database WHERE datname='$$d'" 2>/dev/null | grep -q 1 \
+	   || docker compose $(DEV) exec -T db createdb -U $$u $$d 2>/dev/null \
+	   || { echo "  test database unavailable — database tests will skip"; exit 0; }; \
+	 docker compose $(DEV) run --rm --no-deps \
+	   -e DATABASE_URL="postgresql+psycopg://$$u:$$p@db:5432/$$d" \
+	   api alembic upgrade head >/dev/null 2>&1 \
+	   || echo "  could not migrate $$d — database tests will skip"
 
 .PHONY: test
-test: ## pytest with coverage (landing tests need the dev db up)
-	cd api && TEST_DATABASE_URL="postgresql+psycopg://$$(grep -E '^POSTGRES_USER=' ../.env | cut -d= -f2):$$(grep -E '^POSTGRES_PASSWORD=' ../.env | cut -d= -f2)@127.0.0.1:5432/$$(grep -E '^POSTGRES_DB=' ../.env | cut -d= -f2)" pytest
+test: test-db ## pytest with coverage
+	cd api && TEST_DATABASE_URL="postgresql+psycopg://$$(grep -E '^POSTGRES_USER=' ../.env | cut -d= -f2):$$(grep -E '^POSTGRES_PASSWORD=' ../.env | cut -d= -f2)@127.0.0.1:5432/$$(grep -E '^POSTGRES_DB=' ../.env | cut -d= -f2)_test" $(BIN)pytest
 
 .PHONY: check
 check: lint types test ## Everything CI runs on the API

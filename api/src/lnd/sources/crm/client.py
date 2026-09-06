@@ -27,6 +27,13 @@ log = logging.getLogger(__name__)
 
 SOURCE = "crm"
 PROGRAMS_PATH = "/api/learning-integration/programs"
+#: The employee roster on its own. `/programs` identifies people by
+#: `user_odoo_id` only, so every org attribute — department, sector, company,
+#: job level — had to be gathered by walking every program first. More
+#: importantly this is the only endpoint that can see someone who has *never*
+#: attended anything, which is what participation rate's denominator and the
+#: coverage report both need (Q-15).
+USERS_PATH = "/api/learning-integration/get_users"
 
 #: The key goes here and nowhere else. `Authorization` is NOT accepted — it
 #: means an OAuth token elsewhere in this API, and a service key sent there
@@ -179,60 +186,111 @@ class CrmClient:
         )
 
     # ------------------------------------------------------------- fetching
-    def _get_page(self, page: int, filters: dict[str, str] | None = None) -> dict[str, Any]:
-        params: dict[str, Any] = {"page": page, "per_page": self.per_page}
+    def _get_page(
+        self,
+        path: str,
+        collection: str,
+        page: int,
+        filters: dict[str, str] | None = None,
+        per_page: int | None = None,
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {"page": page, "per_page": per_page or self.per_page}
         for key, value in (filters or {}).items():
             # The repository's own contract: filter[id], filter[type], and so on.
             params[key if key.startswith("filter[") else f"filter[{key}]"] = value
 
-        response = self._http().get(PROGRAMS_PATH, params=params)
+        response = self._http().get(path, params=params)
         self._raise_for_status(response)
 
         body = response.json()
-        if not isinstance(body, dict) or "programs" not in body or "meta" not in body:
+        if not isinstance(body, dict) or collection not in body or "meta" not in body:
             raise CrmError(
-                "CRM response did not carry `programs` and `meta`.",
+                f"CRM response did not carry `{collection}` and `meta`.",
                 retryable=False,
                 code="unexpected_shape",
             )
         return body
 
-    def iter_programs(self, **filters: str) -> Iterator[dict[str, Any]]:
-        """Yield every program payload, walking the pages.
+    def _walk(
+        self,
+        path: str,
+        collection: str,
+        filters: dict[str, str] | None = None,
+        per_page: int | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        """Page through a collection, yielding payloads as they arrive.
 
         Paging follows `meta.has_more_pages` rather than counting rows: the
         endpoint echoes back the page you asked for, so a length-based guess
-        would either stop early or loop.
+        would either stop early or loop forever on a page that is exactly full.
 
-        Order is id descending and stable, so paging is safe (§3).
+        Both endpoints order by id descending and stable, so paging is safe.
         """
         page = 1
         seen = 0
         while True:
-            body = self._get_page(page, filters)
-            programs = body["programs"]
+            body = self._get_page(path, collection, page, filters, per_page)
+            items = body[collection]
             meta = body["meta"]
 
-            yield from programs
-            seen += len(programs)
+            yield from items
+            seen += len(items)
 
             log.info(
-                "fetched a page of programs",
+                "fetched a page",
                 extra={
                     "event": "crm.page",
+                    "collection": collection,
                     "page": meta.get("current_page", page),
-                    "returned": len(programs),
+                    "returned": len(items),
                     "total": meta.get("total"),
                 },
             )
 
             if not meta.get("has_more_pages"):
                 log.info(
-                    "finished walking the dataset",
-                    extra={"event": "crm.fetch_complete", "programs": seen},
+                    "finished walking the collection",
+                    extra={
+                        "event": "crm.fetch_complete",
+                        "collection": collection,
+                        "count": seen,
+                    },
                 )
                 return
             page += 1
+
+    def iter_programs(self, **filters: str) -> Iterator[dict[str, Any]]:
+        """Yield every program payload, walking the pages."""
+        yield from self._walk(PROGRAMS_PATH, "programs", filters)
+
+    def iter_users(self, status: str | None = "active") -> Iterator[dict[str, Any]]:
+        """Yield every employee, walking the pages.
+
+        `status` defaults to `active`: the participation-rate denominator is
+        people who could attend, and someone who has left cannot. Pass None for
+        the whole roster including leavers, which the coverage report may want
+        when reporting on a period they were still employed for.
+
+        Note the endpoint returns 400 rather than an empty page for an
+        unrecognised status — a silent empty result would read as "nobody is
+        employed", which is the kind of quiet zero this platform exists to
+        prevent.
+        """
+        filters = {"filter[status]": status} if status else {}
+        yield from self._walk(
+            USERS_PATH, "users", filters, per_page=get_settings().crm_employee_per_page
+        )
+
+    def fetch_users(self, status: str | None = "active") -> list[dict[str, Any]]:
+        """Every employee, as received. Records a fixture if enabled."""
+        payloads = list(self.iter_users(status))
+        if self._record_fixtures:
+            fixtures.record(SOURCE, "employee", payloads)
+        log.info(
+            "fetched the employee roster",
+            extra={"event": "crm.fetch_complete", "entity": "employee", "count": len(payloads)},
+        )
+        return payloads
 
     def fetch_programs(self, **filters: str) -> list[dict[str, Any]]:
         """Every program payload, as received. Records a fixture if enabled."""

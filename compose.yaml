@@ -35,6 +35,35 @@ x-api-env: &api-env
   AUTH_DEV_BYPASS:          ${AUTH_DEV_BYPASS:-false}
   AUTH_DEV_USER_EMAIL:      ${AUTH_DEV_USER_EMAIL:-}
   AUTH_DEV_USER_NAME:       ${AUTH_DEV_USER_NAME:-}
+  # Source systems. The worker and beat need these as much as the API does —
+  # they are the ones that actually call the CRM.
+  CRM_BASE_URL:             ${CRM_BASE_URL:-}
+  CRM_SERVICE_KEY:          ${CRM_SERVICE_KEY:-}
+  CRM_TIMEOUT_SECONDS:      ${CRM_TIMEOUT_SECONDS:-60}
+  CRM_PER_PAGE:             ${CRM_PER_PAGE:-10}
+  CRM_EMPLOYEE_PER_PAGE:    ${CRM_EMPLOYEE_PER_PAGE:-200}
+  CRM_EMPLOYEE_STATUS:      ${CRM_EMPLOYEE_STATUS:-active}
+  CRM_CHANGED_SINCE_FILTER: ${CRM_CHANGED_SINCE_FILTER:-}
+  SOURCE_RECORD_FIXTURES:   ${SOURCE_RECORD_FIXTURES:-false}
+  # Operational tuning. All have working defaults in config.py, but an incident
+  # is the wrong time to discover that the only way to slow down a sync or widen
+  # a breaker is a code change and a redeploy.
+  SYNC_OVERLAP_SECONDS:            ${SYNC_OVERLAP_SECONDS:-300}
+  SYNC_ABANDONED_AFTER_SECONDS:    ${SYNC_ABANDONED_AFTER_SECONDS:-2400}
+  FRESHNESS_STALE_AFTER_SECONDS:   ${FRESHNESS_STALE_AFTER_SECONDS:-3600}
+  RETRY_ATTEMPTS:                  ${RETRY_ATTEMPTS:-3}
+  RETRY_BASE_DELAY_SECONDS:        ${RETRY_BASE_DELAY_SECONDS:-1.0}
+  RETRY_MAX_DELAY_SECONDS:         ${RETRY_MAX_DELAY_SECONDS:-30.0}
+  RETRY_JITTER:                    ${RETRY_JITTER:-0.25}
+  BREAKER_FAILURE_THRESHOLD:       ${BREAKER_FAILURE_THRESHOLD:-3}
+  BREAKER_COOLDOWN_SECONDS:        ${BREAKER_COOLDOWN_SECONDS:-600}
+  ALERT_RENOTIFY_SECONDS:          ${ALERT_RENOTIFY_SECONDS:-21600}
+  ALERT_RECONCILE_DELETE_THRESHOLD: ${ALERT_RECONCILE_DELETE_THRESHOLD:-25}
+  ALERT_RECONCILE_WINDOW_SECONDS:  ${ALERT_RECONCILE_WINDOW_SECONDS:-86400}
+  DB_POOL_SIZE:                    ${DB_POOL_SIZE:-5}
+  DB_MAX_OVERFLOW:                 ${DB_MAX_OVERFLOW:-5}
+  DB_ECHO:                         ${DB_ECHO:-false}
+  SESSION_COOKIE_NAME:             ${SESSION_COOKIE_NAME:-lnd_session}
 
 services:
   # ------------------------------------------------------------------ proxy
@@ -71,7 +100,7 @@ services:
 
   # ----------------------------------------------------------------- worker
   # Celery: sync, transform, exports, email. Never reachable from `edge`;
-  # `egress` gives it outbound access to the CRM, the HRIS, LinkedIn and SMTP.
+  # `egress` gives it outbound access to the CRM and SMTP.
   worker:
     <<: *api-image
     command: ["celery", "-A", "lnd.worker.celery_app:celery_app", "worker",

@@ -118,3 +118,54 @@ class CrmProgramPuller:
                     f"a {self.source} {self.entity} payload arrived without an `id`"
                 )
             yield str(identifier), payload
+
+
+@dataclass
+class CrmEmployeePuller:
+    """The employee roster from the CRM.
+
+    A second entity from the same source, not a second source: same host, same
+    key, same client. It exists because `/programs` can only show people who
+    have touched a program — 417 of them — while participation rate needs the
+    people who have *not*, and the coverage report is by definition a list of
+    them (Q-15).
+
+    Defaults to active employees: the denominator is people who could attend,
+    and a leaver could not. The roster is small and changes slowly, so it is
+    fetched whole every pass like everything else here; the landing layer
+    discards what has not changed.
+    """
+
+    client: CrmClient
+    status: str | None = "active"
+
+    source: Source = field(default=Source.CRM, init=False)
+    entity: Entity = field(default=Entity.EMPLOYEE, init=False)
+    transient_errors: tuple[type[Exception], ...] = field(default=(CrmError,), init=False)
+
+    @classmethod
+    def from_settings(cls, client: CrmClient) -> CrmEmployeePuller:
+        return cls(client=client, status=get_settings().crm_employee_status or None)
+
+    def fetch(self, *, changed_since: datetime | None) -> Iterator[Record]:
+        if changed_since is not None:
+            log.info(
+                "source cannot narrow by date; fetching everything",
+                extra={
+                    "event": "sync.fetch.unfiltered",
+                    "source": str(self.source),
+                    "entity": str(self.entity),
+                    "changed_since": changed_since,
+                },
+            )
+
+        for payload in self.client.iter_users(self.status):
+            # odoo_id, not employee_code: it is what /programs uses for
+            # user_odoo_id on every enrollment, attendance row and answer, so it
+            # is the key the two entities actually join on.
+            identifier = payload.get("odoo_id")
+            if identifier is None:
+                raise MissingNaturalKey(
+                    f"a {self.source} {self.entity} payload arrived without an `odoo_id`"
+                )
+            yield str(identifier), payload

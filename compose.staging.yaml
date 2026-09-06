@@ -1,5 +1,5 @@
 # staging overlay — VM, 2 vCPU / 4 GB.
-# CRM sandbox plus an anonymised HRIS extract. Never live PII.
+# CRM sandbox only, never the live tenant. Never live PII.
 #
 # Images are pulled by tag, never built here: what CI tested is what runs, and
 # the same digest is later promoted to production unchanged.

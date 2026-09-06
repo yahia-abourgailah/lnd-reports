@@ -42,7 +42,14 @@ EXPECTED_ENTITIES: tuple[tuple[Source, Entity], ...] = (
     (Source.CRM, Entity.ENROLLMENT),
     (Source.CRM, Entity.ATTENDANCE),
     (Source.CRM, Entity.EVALUATION),
-    (Source.HRIS, Entity.EMPLOYEE),
+    # The roster, and with it the participation denominator. Declared against
+    # the CRM, not the HRIS: `get_users` returns every active employee with
+    # company, department, sector, position and job level, which is the whole
+    # reason the HRIS left the plan. Left pointing at HRIS this would report
+    # never_synced forever — a permanent alert against an integration nobody is
+    # going to build — while the roster that does sync appeared only through the
+    # observed half of the union.
+    (Source.CRM, Entity.EMPLOYEE),
 )
 
 _SOURCE_ORDER = {member: index for index, member in enumerate(Source)}

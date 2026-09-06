@@ -41,7 +41,7 @@ from lnd.models import SyncMode, SyncStatus, SyncTrigger
 from lnd.sync.backoff import honours_retryable_flag, retry
 from lnd.sync.breaker import check_breaker
 from lnd.sync.presence import mark_seen, reconcile_absent
-from lnd.sync.pullers import Record, SourcePuller
+from lnd.sync.pullers import CrmEmployeePuller, Record, SourcePuller
 from lnd.sync.runs import SyncAlreadyRunning, record_sync_run
 
 log = logging.getLogger(__name__)
@@ -219,7 +219,11 @@ def configured_pullers() -> list[SourcePuller]:
     from lnd.sources.crm.client import CrmClient
     from lnd.sync.pullers import CrmProgramPuller
 
-    return [CrmProgramPuller.from_settings(CrmClient())]
+    client = CrmClient()
+    return [
+        CrmProgramPuller.from_settings(client),
+        CrmEmployeePuller.from_settings(client),
+    ]
 
 
 def summarise(summaries: Iterable[SyncSummary]) -> dict[str, int]:

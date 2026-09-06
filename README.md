@@ -1,9 +1,15 @@
 # L&D Analytics Platform
 
-Read-only analytics over the CRM, Microsoft Forms, the HRIS and LinkedIn
-Learning, replacing `L&D Main Reports.xlsx`. Nothing here writes to any source
-system: there is no CRM write client in the codebase, and the credentials are
-issued read-only.
+Read-only analytics over the company CRM, replacing `L&D Main Reports.xlsx`.
+Nothing here writes to any source system: there is no CRM write client in the
+codebase, and the credentials are issued read-only.
+
+The CRM is the single source. It was not meant to be — the plan named Microsoft
+Forms for feedback and an HRIS for the employee roster — but reading the real
+payloads closed both. Feedback already arrives on the programs endpoint as
+`survey` and `survey_answers[]`, and `user` carries company, department, sector,
+position and job level, so neither integration is needed. See
+[`docs/crm-api-field-inventory.md`](docs/crm-api-field-inventory.md).
 
 Specification: [`docs/`](docs/) — BRD v1.1 and the delivery plan.
 
@@ -29,6 +35,27 @@ make psql            # a shell on the database
 make down            # stop;  make nuke  also drops the volumes
 ```
 
+### No `make`?
+
+`'make' is not recognized` means it is not installed — it ships with macOS and
+Linux but not Windows, and Git Bash does not include it. `winget install
+GnuWin32.Make` and reopen the terminal, or work from inside WSL.
+
+Without it, note that plain `docker compose up` is **not** equivalent: there is
+no `compose.override.yaml` here, so it loads `compose.yaml` alone — nothing
+publishes a port, your source is not mounted, and no migrations run. Every
+container reports healthy and nothing works. Both files, every time:
+
+```bash
+copy .env.example .env
+docker compose -f compose.yaml -f compose.dev.yaml up --build -d
+docker compose -f compose.yaml -f compose.dev.yaml run --rm --no-deps api alembic upgrade head
+```
+
+Copying `.env` by hand skips the secret generation `make init` does, so open it
+and replace `SESSION_SECRET`, `POSTGRES_PASSWORD` and `APP_DB_PASSWORD` with
+real values before starting.
+
 ---
 
 ## Shape
@@ -53,8 +80,13 @@ api/
     middleware.py       request id, access log, security headers
     auth/               OIDC + PKCE, signed session cookie
     api/v1/             /v1/health, /v1/auth/*
+    models/             SQLAlchemy tables; the shared Source and Entity enums
+    sources/crm/        HTTP client and typed models for the two CRM endpoints
+    ingest/             payload hashing and the append-only landing of raw
+    sync/               the runner, watermarks, retry, breaker, presence
+    alerts/             freshness and reconcile rules, with renotify suppression
     worker/             Celery app and the beat schedule
-  alembic/versions/0001_baseline_schemas.py
+  alembic/versions/     0001 schemas → 0006 source_presence
 
 web/                    React 18 + TS + Vite + TanStack Query
 

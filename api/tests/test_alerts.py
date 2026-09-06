@@ -84,7 +84,7 @@ def _sync_everything_healthily(
         (CRM, Entity.ENROLLMENT),
         (CRM, Entity.ATTENDANCE),
         (CRM, Entity.EVALUATION),
-        (HRIS, Entity.EMPLOYEE),
+        (CRM, Entity.EMPLOYEE),
     ):
         if except_for == (source, entity):
             continue
@@ -155,7 +155,7 @@ class TestRules:
             "never_synced:crm:enrollment",
             "never_synced:crm:attendance",
             "never_synced:crm:evaluation",
-            "never_synced:hris:employee",
+            "never_synced:crm:employee",
         }
 
     def test_never_synced_is_a_warning_not_a_critical(self, live_db: None) -> None:

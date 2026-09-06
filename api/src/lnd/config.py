@@ -89,6 +89,18 @@ class Settings(BaseSettings):
     # How far back a reconcile counts as current news.
     alert_reconcile_window_seconds: int = 86400
 
+    # -- calendar -----------------------------------------------------------
+    # The month the company's fiscal year starts in. Finance confirmed
+    # January (2026-09-06), so the fiscal calendar is the calendar calendar and
+    # fiscal_year/fiscal_quarter equal their civil counterparts.
+    #
+    # The setting stays, and so does the offset arithmetic behind it. It costs
+    # nothing while the answer is 1, and the alternative — hardcoding the
+    # calendar year because that is what we were told once — is how a reporting
+    # layer comes to need surgery the year a subsidiary is acquired. Changing
+    # it does not rewrite dim_date on its own; see transform.dates.
+    fiscal_year_start_month: int = Field(default=1, ge=1, le=12)
+
     # -- session ------------------------------------------------------------
     session_secret: str = Field(default="", repr=False)
     session_cookie_name: str = "lnd_session"
@@ -114,6 +126,16 @@ class Settings(BaseSettings):
     #: Each entry carries a program's whole roster and every answer on it, so a
     #: big page is a big response. 10-25 is the documented comfortable size.
     crm_per_page: int = 10
+    #: The roster is small rows and many of them — 1,427 active employees, so
+    #: at the programs page size that is 143 requests against a 120/min limit.
+    #: A program is ~90 KB and a roster row is a few hundred bytes, so the two
+    #: endpoints want opposite page sizes.
+    crm_employee_per_page: int = 200
+    #: Which employees the roster pull asks for. `active` is the participation
+    #: rate denominator — people who could attend. Blank fetches everyone,
+    #: including leavers, which the coverage report may want for a period they
+    #: were still employed in.
+    crm_employee_status: str = "active"
     # The `filter[...]` key the CRM accepts for "changed since", if it accepts
     # one at all. Empty means it does not, and the incremental sync degrades to
     # fetching everything each pass — which is correct, just wasteful: nothing

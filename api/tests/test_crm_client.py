@@ -11,6 +11,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
+from lnd.config import get_settings
 from lnd.sources.crm import KEY_HEADER, PROGRAMS_PATH, CrmClient, CrmError
 from tests.fixtures import crm_program
 
@@ -154,6 +155,31 @@ def test_per_page_is_sent() -> None:
     assert seen == ["25"]
 
 
+def test_the_roster_uses_its_own_page_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A programs page and a roster page are opposite shapes.
+
+    One program carries its whole roster and every survey answer on it, so ten
+    to a page is already a large response. A roster row is a few hundred bytes,
+    and there are 1,427 active employees — at the programs page size that is 143
+    requests against a documented 120/minute limit, so the pull would be rate
+    limited part-way through. The two page sizes have to move independently.
+    """
+    monkeypatch.setenv("CRM_EMPLOYEE_PER_PAGE", "200")
+    get_settings.cache_clear()
+
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.params["per_page"])
+        body = crm_program.page(programs=[])
+        return httpx.Response(200, json={"users": [], "meta": body["meta"]})
+
+    with client_returning(handler, per_page=10) as crm:
+        crm.fetch_users()
+
+    assert seen == ["200"]
+
+
 # --------------------------------------------------------------------- filters
 def test_filters_are_sent_in_the_repositorys_contract() -> None:
     seen: list[str] = []
@@ -279,7 +305,13 @@ def test_the_client_exposes_no_way_to_write() -> None:
     }
     forbidden = {"post", "put", "patch", "delete", "create", "update", "write", "save"}
     assert not (surface & forbidden)
-    assert surface == {"close", "fetch_programs", "iter_programs"}
+    assert surface == {
+        "close",
+        "fetch_programs",
+        "iter_programs",
+        "fetch_users",
+        "iter_users",
+    }
 
 
 # --------------------------------------------------------------- the base URL
@@ -316,3 +348,151 @@ def test_the_request_path_is_never_doubled() -> None:
         crm.fetch_programs()
 
     assert seen == ["/api/learning-integration/programs"]
+
+
+# ------------------------------------------------------- the roster endpoint
+def _roster_page(users: list[dict[str, object]], **meta: object) -> dict[str, object]:
+    block = {
+        "current_page": 1,
+        "per_page": 100,
+        "total": len(users),
+        "last_page": 1,
+        "from": 1 if users else None,
+        "to": len(users) or None,
+        "has_more_pages": False,
+    }
+    block.update(meta)
+    return {"users": users, "meta": block}
+
+
+EMPLOYEE = {
+    "id": 12,
+    "odoo_id": "4521",
+    "name": "Mona Farid",
+    "employee_code": "50231",
+    "status": "active",
+    "department": {"id": 8, "odoo_id": "310", "name": "Sales - New Cairo"},
+    "sector": "Commercial",
+    "company": {"id": 1, "odoo_id": "3", "name": "The Address Investments"},
+    "franchise": {"id": 3, "odoo_id": "77", "name": "New Cairo Branch", "code": "NC-01"},
+    "job_level_name": "Senior Specialist",
+    "job_level_grade": "G7",
+}
+
+
+def test_the_roster_is_read_from_its_own_endpoint() -> None:
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        return httpx.Response(200, json=_roster_page([EMPLOYEE]))
+
+    with client_returning(handler) as crm:
+        users = crm.fetch_users()
+
+    assert seen == ["/api/learning-integration/get_users"]
+    assert users[0]["odoo_id"] == "4521"
+
+
+def test_the_roster_asks_for_active_employees_by_default() -> None:
+    """The participation-rate denominator is people who could attend, and
+    someone who has left could not."""
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url.query, "utf-8"))
+        return httpx.Response(200, json=_roster_page([]))
+
+    with client_returning(handler) as crm:
+        crm.fetch_users()
+
+    assert "filter%5Bstatus%5D=active" in seen[0]
+
+
+def test_the_whole_roster_can_be_asked_for() -> None:
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url.query, "utf-8"))
+        return httpx.Response(200, json=_roster_page([]))
+
+    with client_returning(handler) as crm:
+        crm.fetch_users(status=None)
+
+    assert "filter" not in seen[0]
+
+
+def test_the_roster_pages() -> None:
+    pages = {
+        1: _roster_page([EMPLOYEE, EMPLOYEE], has_more_pages=True),
+        2: _roster_page([EMPLOYEE], current_page=2, has_more_pages=False),
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=pages[int(request.url.params["page"])])
+
+    with client_returning(handler) as crm:
+        assert len(crm.fetch_users()) == 3
+
+
+def test_a_missing_roster_endpoint_surfaces_clearly() -> None:
+    """It is documented but not yet deployed. A 404 must say so rather than
+    read as an empty roster — "nobody is employed" is the quiet zero this
+    platform exists to prevent."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"message": "The route could not be found."})
+
+    with client_returning(handler) as crm, pytest.raises(CrmError) as caught:
+        crm.fetch_users()
+
+    assert caught.value.retryable is False
+
+
+def test_a_rejected_status_is_not_an_empty_page() -> None:
+    """The endpoint returns 400 for an unrecognised status, deliberately."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400,
+            json={
+                "error": "invalid_filter",
+                "message": "filter[status] must be one of: active, inactive.",
+            },
+        )
+
+    with client_returning(handler) as crm, pytest.raises(CrmError) as caught:
+        crm.fetch_users(status="employed")
+
+    assert caught.value.code == "bad_request"
+
+
+def test_the_employee_model_parses_the_documented_shape() -> None:
+    from lnd.sources.crm import Employee
+
+    employee = Employee.model_validate(EMPLOYEE)
+    assert employee.odoo_id == "4521"
+    assert employee.is_active
+    assert employee.company is not None and employee.company.odoo_id == "3"
+    assert employee.franchise is not None and employee.franchise.code == "NC-01"
+    # Kept as text: the roster documents "G7" while the program summary sends
+    # "9". The transform decides once, seeing what actually arrived.
+    assert employee.job_level_grade == "G7"
+
+
+def test_an_employee_without_a_department_still_parses() -> None:
+    """Not every row is fully synced from Odoo; sector is null without one."""
+    from lnd.sources.crm import Employee
+
+    employee = Employee.model_validate(
+        {
+            "id": 1,
+            "odoo_id": "9",
+            "status": "active",
+            "department": None,
+            "company": None,
+            "sector": None,
+        }
+    )
+    assert employee.sector_conformed is None
+    assert employee.department is None
