@@ -279,7 +279,10 @@ FACILITATOR_PERFORMANCE = _quality(
     "facilitator_performance",
     "Facilitator Performance",
     "score_facilitator_performance",
-    "facilitator 4 or better",
+    # The template already appends "4 or better"; carrying it in the label too
+    # rendered "rating this facilitator 4 or better 4 or better on the 1-5
+    # scale" into every tooltip and every export stamp.
+    "facilitator",
     Provenance.UNCHANGED,
 )
 

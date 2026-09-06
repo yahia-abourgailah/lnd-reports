@@ -109,6 +109,20 @@ jobs:
           TEST_DATABASE_URL: postgresql+psycopg://lnd:lnd@localhost:5432/lnd_test
         run: pytest tests/test_landing.py -q --no-header -p no:cacheprovider --no-cov -x
 
+      # Already covered by `pytest` above. Run again on its own so that a moved
+      # figure is a named, red step in the checks list rather than one failure
+      # among four hundred — the person who has to decide whether the new
+      # number is right should not have to go looking for it.
+      #
+      # A failure here is not a broken test. It means a published figure moved,
+      # and the fix is either to correct the code or to regenerate
+      # `tests/reference/golden.json` in this same pull request, where a
+      # reviewer sees the number and agrees with it.
+      - name: No published figure moved
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg://lnd:lnd@localhost:5432/lnd_test
+        run: pytest tests/test_reference.py -q --no-header -p no:cacheprovider --no-cov
+
   # ---------------------------------------------------------------------- web
   web:
     name: Web — lint, types, build
