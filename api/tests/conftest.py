@@ -5,7 +5,7 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Connection, Engine, create_engine, delete, func, select, text
+from sqlalchemy import Connection, Engine, create_engine, delete, func, insert, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -78,6 +78,20 @@ def db_engine() -> Iterator[Engine]:
     absent, so `pytest` still works on a machine with nothing running — CI is
     what guarantees they actually execute.
 
+    POINT IT AT ITS OWN DATABASE, NOT AT `lnd`
+
+        createdb lnd_test && alembic upgrade head   (once)
+        TEST_DATABASE_URL=...:5432/lnd_test pytest
+
+    Most fixtures here truncate and roll back, so sharing the dev database
+    looks safe and mostly is. What is not safe is sharing it with a *running
+    stack*: beat evaluates alerts every fifteen minutes and the sync writes
+    `sync_run` rows, and both are inputs the alert rules read. A test that
+    pins `now` to a fixed date then disagrees with rows written by the real
+    clock — six of the alert tests fail this way, for reasons that have
+    nothing to do with the code under test. CI builds a fresh database per
+    run, which is why it never sees this.
+
     Session-scoped so an unreachable database costs one connect timeout for the
     run rather than one per test, and `connect_timeout` is set because psycopg
     otherwise waits indefinitely on a port nothing is listening on — which is
@@ -126,6 +140,27 @@ def live_db(db_engine: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[None
 
     Notes the highest existing id on the way in and deletes everything above it
     on the way out, so a dev database keeps whatever history it already had.
+
+    UNRESOLVED ALERTS ARE THE EXCEPTION, AND HAVE TO BE PUT ASIDE
+
+    High-water marking assumes a pre-existing row is inert — true of a
+    `sync_run` and a `raw.source_record`, and false of a *live*
+    `alert_notification`. `dispatch_alerts` resolves every unresolved row it
+    does not re-detect, so a dev stack's own alerts get swept into whatever the
+    test dispatches, stamped with the test's frozen `now`. When that `now` is
+    earlier than the row's real `first_seen_at` — which it is, because the
+    tests pin a date rather than read the clock — the resolution violates
+    `ck_alert_notification_resolved_after_first_seen` and the test fails for a
+    reason that has nothing to do with the code under test.
+
+    It only bites when the suite shares a database with a running stack: the
+    beat container evaluates alerts every fifteen minutes and opens a
+    `never_synced` row per entity. CI builds a fresh database and never sees
+    it, which is exactly why it is worth handling here rather than leaving as a
+    trap for whoever next runs the tests against their dev database.
+
+    So live rows are lifted out for the duration and put back afterwards, ids
+    and timestamps intact.
     """
     monkeypatch.setenv("DATABASE_URL", db_engine.url.render_as_string(hide_password=False))
     get_settings.cache_clear()
@@ -136,12 +171,31 @@ def live_db(db_engine: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[None
             model: session.scalar(select(func.coalesce(func.max(model.id), 0))) or 0
             for model in (SyncRun, AlertNotification, RawRecord, SourcePresence)
         }
+        # Captured as plain dicts rather than ORM objects: these have to
+        # survive the session that read them and be reinserted into another.
+        parked = [
+            {
+                column.name: getattr(row, column.name)
+                for column in AlertNotification.__table__.columns
+            }
+            for row in session.scalars(
+                select(AlertNotification).where(AlertNotification.resolved_at.is_(None))
+            ).all()
+        ]
+        if parked:
+            session.execute(
+                delete(AlertNotification).where(
+                    AlertNotification.id.in_([row["id"] for row in parked])
+                )
+            )
 
     yield
 
     with lnd_db.session_scope() as session:
         for model, high_water in marks.items():
             session.execute(delete(model).where(model.id > high_water))
+        if parked:
+            session.execute(insert(AlertNotification.__table__), parked)
     lnd_db.dispose_engine()
     get_settings.cache_clear()
 
@@ -188,6 +242,63 @@ def db(db_engine: Engine) -> Iterator[Session]:
     connection = db_engine.connect()
     transaction = connection.begin()
     connection.execute(text("TRUNCATE raw.source_record RESTART IDENTITY"))
+
+    session = Session(bind=connection, expire_on_commit=False)
+    try:
+        yield session
+    finally:
+        session.close()
+        transaction.rollback()
+        connection.close()
+
+
+# ---------------------------------------------------------------------------
+# the star schema and the transform
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def core_db(db_engine: Engine) -> Iterator[Session]:
+    """A session over `raw`, `core`, `app` and `ops`, rolled back afterwards.
+
+    The transform's tests need all four schemas at once — it reads `raw`,
+    consults the `app` overlay, writes `core` and records into `ops` — and
+    several of its guarantees are constraints rather than code: the fact grains,
+    the one-current-version index on `dim_employee`, the total CHECK on
+    `dim_session`. None of that can be demonstrated against SQLite, so this
+    builds on `db_engine` and skips with it.
+
+    Everything is truncated on the way in. A dev database carries rows from
+    real syncs, and a test asserting "exactly two attendance rows" would
+    otherwise pass or fail depending on what someone did in the terminal an
+    hour ago. TRUNCATE is transactional in PostgreSQL, so the rollback puts
+    every existing row back.
+    """
+    from lnd.db import SCHEMAS, Base
+    from lnd.models import (  # noqa: F401 - importing registers the tables
+        DimProgram,
+        DqException,
+        ProgramOverride,
+    )
+
+    with db_engine.begin() as setup:
+        for schema in SCHEMAS:
+            setup.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+    Base.metadata.create_all(db_engine, checkfirst=True)
+
+    connection = db_engine.connect()
+    transaction = connection.begin()
+    # CASCADE because the facts reference the dimensions; RESTART IDENTITY so
+    # surrogate keys are predictable within a test.
+    connection.execute(
+        text(
+            "TRUNCATE raw.source_record, core.dim_date, core.dim_trainer, "
+            "core.dim_employee, core.dim_program, core.dim_session, "
+            "core.fact_enrollment, core.fact_attendance, core.fact_evaluation, "
+            "app.enrichment_program_override, app.trainer_alias, "
+            "app.survey_question_map, app.survey_option_score, "
+            "app.identity_mapping, ops.dq_exception "
+            "RESTART IDENTITY CASCADE"
+        )
+    )
 
     session = Session(bind=connection, expire_on_commit=False)
     try:

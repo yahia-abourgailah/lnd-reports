@@ -4,22 +4,24 @@ Revision ID: 0008
 Revises: 0007
 Created: week 3
 
-`dim_employee` has two sources, not one.
+Closes the gap 0007's `dim_employee` docstring names: "THIS IS NOT A ROSTER".
 
-`get_users` returns who works here — 1,430 people, and no position, email or
-mobile for any of them. The programs payload carries a full `user` object for
-everyone who has ever trained, including those fields, and including people the
-roster no longer has: 149 of 419, being 126 leavers plus 23 from two companies
-that no longer exist as separate entities.
+That table was built from `user` objects nested inside programs, so it knew only
+people who had touched some training — enough for every attribute breakdown, and
+not enough for Participation Rate or Coverage Gap, which need a denominator over
+the whole company. `get_users` arrived after that branch was cut and supplies it:
+1,435 current staff rather than the 419 who happen to have attended something.
 
-Both have to be in the dimension. Leave the second group out and a third of
-every attendance figure fails to key and quarantines — the numerator silently
-losing a third of itself, which is the exact failure this pipeline exists to
-prevent. Put them in unflagged and they are counted as current staff, inflating
-the denominator with people who left.
+Two sources means two populations that do not agree. 149 of the 419 trained
+people are not on the roster — 126 leavers and 23 from two companies that no
+longer exist as separate entities. Both belong in the dimension. Without the
+departed, a third of every attendance figure fails to key and is quarantined;
+without this flag they are counted as current staff and inflate the very
+denominator the table exists to make honest.
 
-Hence one boolean. Present and joinable for facts; excluded from headcount by a
-column rather than by a filter every future query has to remember.
+Defaulting to true is correct for the rows already there: everything loaded
+before this point came from a source that could not distinguish the two, and the
+first pass with a roster restates each person on the evidence.
 """
 
 from __future__ import annotations
@@ -47,8 +49,8 @@ def upgrade() -> None:
         ),
         schema="core",
     )
-    # Headcount filters on it before anything else, and pairs it with the
-    # as-of range that ix_dim_employee_asof already leads on.
+    # Headcount filters on this before anything else, paired with the validity
+    # window every as-of question narrows by.
     op.create_index(
         "ix_dim_employee_roster",
         "dim_employee",

@@ -1,122 +1,138 @@
-"""Populating `core.dim_date`.
+"""`core.dim_date`: the calendar, generated rather than synced.
 
-Generated, not transformed — the calendar owes nothing to any source. It is
-built once over a range wide enough to cover the data and refreshed only when
-the range needs extending, which is why this is a function somebody calls rather
-than a step in the nightly run.
+A date dimension earns its place here for one reason that has nothing to do
+with convenience: **a month with no training must still appear in a trend, as a
+zero.** Group the facts themselves by month and an empty month simply is not in
+the result set, so the chart draws a line from August to October and the gap
+reads as a dip rather than as an absence. Every monthly figure in section 9 is
+rendered as a trend (FR-D04), so this affects all of them.
+
+It also gives every view one spelling of "September 2026" — the dashboard, the
+XLSX export and the PDF pack all read `month_label` rather than each formatting
+a date in whatever locale the process happens to have.
+
+FISCAL YEAR
+
+Calendar-aligned, because nobody has told us otherwise. That is a *stated
+assumption*, not a discovered fact, and it is held in its own column precisely
+so that correcting it is a regeneration of this table and a change to nothing
+else. If L&D's year starts in July, set `FISCAL_YEAR_START_MONTH` to 7, re-run
+`ensure_dates`, and every fiscal rollup follows. See the week-3 open questions.
 """
 
 from __future__ import annotations
 
 import calendar
-import datetime as dt
+import logging
+from datetime import date, timedelta
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from lnd.config import get_settings
 from lnd.models.core import DimDate
 
-#: Friday and Saturday, not Saturday and Sunday. The company and its sessions
-#: are in Egypt, so the working week runs Sunday to Thursday. Hardcoding the
-#: Western weekend would misreport "sessions delivered at the weekend" on every
-#: row, and — worse — it would look plausible.
-WEEKEND_ISO_DAYS = frozenset({5, 6})  # 1 = Monday ... 7 = Sunday
+log = logging.getLogger(__name__)
+
+#: 1 = the fiscal year starts in January. An assumption, held in one place.
+FISCAL_YEAR_START_MONTH = 1
+
+#: How far past the latest known fact date to pre-generate. A fact whose date
+#: has no `dim_date` row fails its foreign key, and the failure would land on
+#: whichever unlucky pass first sees a session scheduled for next year. A year
+#: of headroom is a few hundred rows.
+LOOKAHEAD_DAYS = 400
 
 
-def fiscal_year_and_quarter(day: dt.date, start_month: int) -> tuple[int, int]:
-    """The fiscal year and quarter a day falls in.
+def _fiscal(day: date) -> tuple[int, int]:
+    """(fiscal_year, fiscal_quarter) for a date.
 
-    A fiscal year is labelled by the calendar year it **ends** in, which is the
-    common convention: with an April start, 2026-04-01 is in FY2027.
-
-    Finance confirmed a January start, so today both values equal their civil
-    counterparts and this function is an identity. The offset arithmetic is
-    kept and tested anyway — an unexercised branch discovered on the day the
-    answer changes is worse than one that has been correct all along.
+    The fiscal year is named for the calendar year it *starts* in — the
+    convention has to be picked and written down, because a platform that
+    labels FY differently from the finance team's spreadsheets is worse than
+    one with no fiscal columns at all.
     """
-    if start_month == 1:
-        return day.year, (day.month - 1) // 3 + 1
-
-    months_in = (day.month - start_month) % 12
-    fiscal_year = day.year + 1 if day.month >= start_month else day.year
-    return fiscal_year, months_in // 3 + 1
+    offset = (day.month - FISCAL_YEAR_START_MONTH) % 12
+    fiscal_year = day.year if day.month >= FISCAL_YEAR_START_MONTH else day.year - 1
+    return fiscal_year, offset // 3 + 1
 
 
-def _row(day: dt.date, start_month: int) -> dict[str, object]:
-    fiscal_year, fiscal_quarter = fiscal_year_and_quarter(day, start_month)
+def build_row(day: date) -> dict[str, object]:
+    """One `dim_date` row. Pure, so the test asserts on values rather than SQL."""
+    fiscal_year, fiscal_quarter = _fiscal(day)
     return {
-        "date_key": day.year * 10000 + day.month * 100 + day.day,
-        "day": day,
+        "date_key": day,
         "year": day.year,
         "quarter": (day.month - 1) // 3 + 1,
         "month": day.month,
+        "month_label": f"{calendar.month_name[day.month]} {day.year}",
+        "month_start": day.replace(day=1),
         "day_of_month": day.day,
+        # ISO: Monday is 1, Sunday is 7. `weekday()` is 0-based, so add one.
         "day_of_week": day.isoweekday(),
-        "week_of_year": day.isocalendar().week,
-        "month_name": calendar.month_name[day.month],
-        "month_abbr": calendar.month_abbr[day.month],
-        "year_month": f"{day.year:04d}-{day.month:02d}",
+        "is_weekend": day.isoweekday() >= 6,
         "fiscal_year": fiscal_year,
         "fiscal_quarter": fiscal_quarter,
-        "is_weekend": day.isoweekday() in WEEKEND_ISO_DAYS,
     }
 
 
-def populate(session: Session, *, start: dt.date, end: dt.date) -> int:
-    """Fill the calendar from `start` to `end` inclusive. Idempotent.
+def ensure_dates(session: Session, *, start: date, end: date) -> int:
+    """Fill `dim_date` across [start, end]. Returns how many rows were added.
 
-    `ON CONFLICT DO NOTHING` rather than an upsert: a day's attributes are a
-    function of the day itself, so an existing row is already correct and
-    rewriting it would only churn. The one attribute that could change is the
-    fiscal offset, and that is a deliberate rebuild — see `rebuild_fiscal`.
+    Idempotent by conflict, not by a read-then-write check: two transform
+    passes running at once would both see the same gap and both try to fill it,
+    and `ON CONFLICT DO NOTHING` makes the loser a no-op instead of an
+    IntegrityError that fails an otherwise good pass.
     """
     if end < start:
-        raise ValueError(f"end {end} precedes start {start}")
+        raise ValueError(f"date range is inverted: {start} to {end}")
 
-    start_month = get_settings().fiscal_year_start_month
-    rows = [
-        _row(start + dt.timedelta(days=offset), start_month)
-        for offset in range((end - start).days + 1)
-    ]
+    rows = []
+    day = start
+    while day <= end:
+        rows.append(build_row(day))
+        day += timedelta(days=1)
 
-    # RETURNING rather than rowcount: a multi-row INSERT ... ON CONFLICT DO
-    # NOTHING reports -1 through psycopg, so the count has to come from the
-    # rows the statement actually wrote.
-    statement = (
-        insert(DimDate)
-        .values(rows)
-        .on_conflict_do_nothing(index_elements=["date_key"])
-        .returning(DimDate.date_key)
-    )
-    return len(session.execute(statement).all())
+    if not rows:
+        return 0
 
+    statement = insert(DimDate).values(rows).on_conflict_do_nothing(index_elements=["date_key"])
+    added = len(session.execute(statement.returning(DimDate.date_key)).scalars().all())
 
-def rebuild_fiscal(session: Session) -> int:
-    """Restate every existing row's fiscal columns from the current setting.
-
-    Separate from `populate`, and deliberately not automatic. Changing the
-    fiscal year start silently rewrites what "this quarter" meant in every
-    report ever run, so it should be an act somebody performs and can point at,
-    not a side effect of the next nightly job.
-    """
-    start_month = get_settings().fiscal_year_start_month
-    days = session.scalars(select(DimDate.day)).all()
-
-    updated = 0
-    for day in days:
-        fiscal_year, fiscal_quarter = fiscal_year_and_quarter(day, start_month)
-        result = session.execute(
-            update(DimDate)
-            .where(DimDate.day == day)
-            .where(
-                or_(
-                    DimDate.fiscal_year != fiscal_year,
-                    DimDate.fiscal_quarter != fiscal_quarter,
-                )
-            )
-            .values(fiscal_year=fiscal_year, fiscal_quarter=fiscal_quarter)
+    if added:
+        log.info(
+            "extended the calendar",
+            extra={
+                "event": "transform.dates.extended",
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "added": added,
+            },
         )
-        updated += result.rowcount  # type: ignore[attr-defined]
-    return updated
+    return added
+
+
+def ensure_covering(session: Session, days: list[date]) -> int:
+    """Ensure every date in `days` has a row, plus a year of headroom.
+
+    Called by the transform before any fact is written, with every date the
+    pass is about to reference. Filling the *span* rather than the individual
+    dates is deliberate: the empty months between two clusters of training are
+    exactly the rows a trend needs and a per-date fill would omit.
+    """
+    if not days:
+        return 0
+
+    earliest = min(days)
+    latest = max(days)
+
+    # Extend from the earliest date the platform has ever seen, so that
+    # backfilling an older period later does not leave a hole behind the
+    # existing rows.
+    known_earliest = session.scalar(select(func.min(DimDate.date_key)))
+    if known_earliest is not None and known_earliest < earliest:
+        earliest = known_earliest
+
+    return ensure_dates(
+        session, start=earliest.replace(day=1), end=latest + timedelta(days=LOOKAHEAD_DAYS)
+    )

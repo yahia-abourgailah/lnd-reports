@@ -54,9 +54,6 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy import (
-    Enum as SAEnum,
-)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -70,6 +67,7 @@ from lnd.db import SCHEMA_OPS, Base
 # vocabularies for one set of facts is how a sync comes to report an entity
 # under a name the raw layer has never heard of, so there is now one.
 from lnd.ingest.models import Entity, Source
+from lnd.models.columns import enum_column
 
 
 class SyncMode(StrEnum):
@@ -108,36 +106,11 @@ class SyncTrigger(StrEnum):
     MANUAL = "manual"
 
 
-def _enum_values(enum_cls: type[StrEnum]) -> list[str]:
-    """Persist an enum's values, not its member names.
-
-    Without this SQLAlchemy would store `CRM` rather than `crm`, and the column
-    in the database would not match the string the API and the logs use.
-    """
-    return [member.value for member in enum_cls]
-
-
-def _enum_column(enum_cls: type[StrEnum], name: str) -> SAEnum:
-    """A VARCHAR constrained to the enum's values by a CHECK.
-
-    `native_enum=False` on purpose. A native PostgreSQL enum type is a nuisance
-    to extend — `ALTER TYPE ... ADD VALUE` has transaction restrictions that sit
-    badly with migrations running as one transactional one-shot container. This
-    renders as `VARCHAR(32) CHECK (col IN (...))`, which gives the same
-    guarantee and turns adding a source into an ordinary constraint swap.
-
-    The Python side still types as the enum, so mypy rejects a wrong string
-    before the database ever sees it.
-    """
-    return SAEnum(
-        enum_cls,
-        name=name,
-        native_enum=False,
-        create_constraint=True,
-        validate_strings=True,
-        length=32,
-        values_callable=_enum_values,
-    )
+# `_enum_column` used to be defined here. The star schema needed the same
+# pattern in week 3, and two copies of it is how one of them comes to store
+# `CRM` where the other stores `crm` — so it moved to `models/columns.py` and
+# this alias keeps the local spelling.
+_enum_column = enum_column
 
 
 class SyncRun(Base):
@@ -417,3 +390,186 @@ class SourcePresence(Base):
     def __repr__(self) -> str:
         state = "present" if self.is_present else "vanished"
         return f"SourcePresence({self.source}/{self.entity}/{self.source_id} {state})"
+
+
+class DqRule(StrEnum):
+    """Which data-quality rule was violated (BRD §13, FR-F02).
+
+    The governing rule of the whole platform: a record is either counted or
+    registered as an exception, never neither. The workbook's most dangerous
+    behaviour was silent loss — 38 attendees with no employee code simply
+    vanished from sector reporting with no indication anything was missing —
+    and every member of this enum is a case where the platform would otherwise
+    do the same.
+
+    The first eight are the BRD's set. The last three were added in week 3. Two
+    of them followed from the live survey structure turning out to be
+    per-program rather than fixed: a scored answer the platform cannot
+    attribute to a metric is the same kind of silent loss, so it gets the same
+    treatment. The third, ATTENDEE_OUTSIDE_ROSTER, followed from the shape of
+    the payload — see its comment below.
+    """
+
+    IDENTITY_UNRESOLVED = "identity_unresolved"
+    TRAINER_MISSING = "trainer_missing"
+    CUSTOMISED_DEPT_MISSING = "customised_dept_missing"
+    DURATION_UNDERIVABLE = "duration_underivable"
+    ATTENDANCE_NO_ENROLLMENT = "attendance_no_enrollment"
+    EVALUATION_NO_ATTENDANCE = "evaluation_no_attendance"
+    DUPLICATE_ATTENDANCE = "duplicate_attendance"
+    CAPACITY_EXCEEDED = "capacity_exceeded"
+    SURVEY_QUESTION_UNMAPPED = "survey_question_unmapped"
+    SURVEY_OPTION_UNSCORED = "survey_option_unscored"
+
+    #: Somebody attended a session without appearing in the program's `users[]`
+    #: roster at all, so the payload carries no `user` object for them — no
+    #: sector, no department, no job level. They count in Total Participants and
+    #: are absent from every coverage breakdown, which is the workbook's
+    #: 38-attendee defect (P-07) arriving through a different door.
+    #:
+    #: Distinct from ATTENDANCE_NO_ENROLLMENT, which fires for a walk-in: that
+    #: person is in the roster with `is_enrolled` false, so we can still say who
+    #: they are. This one fires when we cannot.
+    #:
+    #: NOT the P-13 denominator question. "Is this attendee inside the
+    #: enrollable population the participation rate divides by?" needs that
+    #: population enumerated, which is Q-15 and still unanswered. When it is
+    #: answered it gets its own rule rather than quietly widening this one.
+    ATTENDEE_OUTSIDE_ROSTER = "attendee_outside_roster"
+
+
+class DqDisposition(StrEnum):
+    """What the platform did with the record — a different question from what
+    a person should do about it.
+
+    Two very different rules share this table. DURATION_UNDERIVABLE excludes a
+    session from both hour metrics; CAPACITY_EXCEEDED excludes nothing and is
+    reported as-is. A completeness indicator (FR-F04) that treated both as
+    losses would understate the platform's coverage, and an operator triaging
+    the queue needs to know which exceptions are actually costing numbers.
+    """
+
+    #: The record is excluded from the metrics the rule affects.
+    QUARANTINED = "quarantined"
+    #: The record counts; something about it is merely worth knowing.
+    COUNTED = "counted"
+
+
+class DqStatus(StrEnum):
+    """Where the exception is in a human's workflow (FR-F03).
+
+    `RESOLVED` is set by the transform, not by a person: an operator resolves
+    an exception by authoring an enrichment value or an identity mapping, and
+    the next transform pass finds the rule no longer violated and closes the
+    row. That ordering matters — a row closed by hand while the underlying data
+    still violates the rule would reopen on the next pass and look like a new
+    problem.
+
+    `DISMISSED` is the deliberate "yes, and that is fine", which the transform
+    must respect rather than re-raise.
+    """
+
+    OPEN = "open"
+    RESOLVED = "resolved"
+    DISMISSED = "dismissed"
+
+
+class DqException(Base):
+    """One open data-quality issue, keyed so it cannot be raised twice.
+
+    Lives in `ops` rather than `core` because it is a fact about the pipeline's
+    encounter with the data, not a fact about training — and because `core` is
+    dropped and rebuilt, while a dismissal a person authored must survive that.
+
+    `exception_key` is the whole design. The transform re-runs over the same
+    programs on every pass, so a rule violated once is violated every time;
+    without a stable key the queue would grow by a copy of itself each pass and
+    a dismissal would last half an hour. The key names the *violation* — the
+    rule plus the identifiers of the thing violating it — and never carries a
+    timestamp, a count or a run id.
+    """
+
+    __tablename__ = "dq_exception"
+    __table_args__ = (
+        # One row per violation, for the life of the violation. Deliberately
+        # not partial on status: a resolved exception that recurs should reopen
+        # this same row and keep its history, and a dismissed one must not be
+        # raisable again — which a partial index would allow.
+        UniqueConstraint("exception_key", name="uq_dq_exception_key"),
+        # The queue, in the order it is worked: FR-F01 lists issues by type and
+        # age.
+        Index("ix_dq_exception_open", "status", "rule", "first_seen_at"),
+        # "Which exceptions affect this program's figures?" — what FR-D12's
+        # per-view warning reads, so it has to stay cheap on every view.
+        Index("ix_dq_exception_program", "crm_program_id"),
+        Index("ix_dq_exception_last_seen", "last_seen_at"),
+        CheckConstraint("occurrences >= 1", name="ck_dq_exception_occurrences_positive"),
+        CheckConstraint("last_seen_at >= first_seen_at", name="ck_dq_exception_seen_ordered"),
+        # Terminal states carry their timestamp; an open one cannot.
+        CheckConstraint(
+            "(status = 'open') = (closed_at IS NULL)", name="ck_dq_exception_closed_is_terminal"
+        ),
+        {"schema": SCHEMA_OPS},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+
+    #: e.g. `identity_unresolved:crm:4821`, `duplicate_attendance:crm:88:4821`.
+    exception_key: Mapped[str] = mapped_column(String(300), nullable=False)
+    rule: Mapped[DqRule] = mapped_column(_enum_column(DqRule, "dq_rule"), nullable=False)
+    disposition: Mapped[DqDisposition] = mapped_column(
+        _enum_column(DqDisposition, "dq_disposition"), nullable=False
+    )
+    status: Mapped[DqStatus] = mapped_column(
+        _enum_column(DqStatus, "dq_status"), nullable=False, server_default=DqStatus.OPEN.value
+    )
+
+    # -- what it is about ---------------------------------------------------
+    # Nullable by design. A rule about a session, a rule about a person and a
+    # rule about a program all belong in one queue, and a column per entity
+    # would mean a migration for every new rule. These three are what the
+    # interface filters and groups on; anything else goes in `details`.
+    crm_program_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    crm_session_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    employee_odoo_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    #: What an operator reads. Written once, at first sight, so the queue reads
+    #: consistently rather than in whatever phrasing the latest pass used.
+    summary: Mapped[str] = mapped_column(String(500), nullable=False)
+    #: The evidence: the two spellings that failed to match, the duplicate's
+    #: id, the question title with no mapping. What makes an exception
+    #: actionable rather than merely visible.
+    details: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+    # -- its life -----------------------------------------------------------
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    #: Bumped by every pass that still finds the violation. The gap between
+    #: this and now is how the queue knows a rule stopped firing.
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    occurrences: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Who dismissed it, and why. Null for a transform-resolved row, which had
+    #: no human involved — and that difference is itself worth keeping.
+    closed_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    closed_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    @property
+    def is_open(self) -> bool:
+        return self.status is DqStatus.OPEN
+
+    @property
+    def costs_numbers(self) -> bool:
+        """True when this exception is actually excluding records from metrics.
+
+        What FR-D12's "how many records are excluded" counts, and what FR-F04's
+        completeness indicator measures. A `COUNTED` exception is information,
+        not a loss.
+        """
+        return self.is_open and self.disposition is DqDisposition.QUARANTINED
+
+    def __repr__(self) -> str:
+        return f"<DqException {self.rule} {self.status} x{self.occurrences} {self.exception_key}>"

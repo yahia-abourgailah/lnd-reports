@@ -1,122 +1,311 @@
-"""Enrichment and the quarantine queue.
+"""The enrichment overlay: `app`.
 
-`app` holds what people add on top of what the sources say. The enrichment
-overrides arrive in week 6; the quarantine queue arrives now, because the
-transform cannot be written honestly without it.
+The only human-authored data in the system. Everything in `core` is derived;
+everything here is a decision somebody made, and the two are kept in separate
+schemas so that "is this number from the CRM or from us?" is answerable by
+looking at which schema it came from.
 
-**Why a queue rather than a null.** The transform meets rows it cannot key —
-an attendance whose `employee_code` is absent, a sector nobody has seen before,
-a session whose times will not subtract. Every one of those has a tempting
-silent answer: null the column, coalesce to 'Unknown', drop the row. All three
-produce a report that is quietly short and looks fine, which is precisely the
-failure the workbook had. So a row the transform cannot key does not enter
-`core` at all — it lands here, with the reason and the payload that produced it,
-and it is counted.
+ENRICHMENT IS AN OVERLAY, NEVER AN EDIT
 
-That counting is the point. `received = counted + quarantined` is asserted
-before every commit, so a row can be rejected but not lost: the two numbers are
-either equal or the run fails with the dashboard still serving the last good
-state.
+Synced data is never mutated. L&D's values live here, keyed to the source's own
+identifiers, and are applied during transform (BRD §7.3). Two things follow:
+
+  * If the CRM later starts supplying a field being maintained by hand, the
+    transform prefers the CRM value and the override quietly retires with no
+    migration and no data fix (FR-C04). `core.ValueSource` records which one
+    won for each row.
+  * Dropping and rebuilding `core` loses nothing. The overrides are not in it.
+
+AND IT IS SUPERSEDED, NEVER UPDATED
+
+Every table here keeps its history: a changed value writes a new row and stamps
+`superseded_at` on the old one, and a partial unique index over the unsuperseded
+rows is what guarantees exactly one live value per key. FR-C03 requires the
+author, the timestamp and the prior values, and an UPDATE in place cannot
+provide the third. The same shape as `raw` — for the same reason.
+
+The module is `app_.py` because `app` is a package name in this codebase and
+importing one over the other is a bug nobody enjoys finding.
 """
 
 from __future__ import annotations
 
-import datetime as dt
+from datetime import datetime
 from enum import StrEnum
-from typing import Any
 
 from sqlalchemy import (
     BigInteger,
-    Boolean,
+    CheckConstraint,
     DateTime,
+    ForeignKey,
     Index,
+    Integer,
+    SmallInteger,
+    String,
     Text,
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from lnd.db import SCHEMA_APP, Base
-from lnd.ingest.models import Entity, Source
-from lnd.models.ops import _enum_column
+from lnd.db import SCHEMA_APP, SCHEMA_CORE, Base
+from lnd.models.columns import enum_column
+from lnd.models.core import EvaluationDimension
 
 
-class QuarantineReason(StrEnum):
-    """Why a row could not enter `core`.
+class EnrichmentField(StrEnum):
+    """Which program attribute an override supplies.
 
-    Coarse on purpose. The free-text `detail` carries the specifics; this is
-    what the data-quality queue groups by, and a hundred distinct reasons would
-    make it unreadable. Each value maps to one action somebody can actually
-    take.
+    One table with a field discriminator rather than a column per attribute.
+    The set of hand-maintained fields shrinks over the project's life as the
+    CRM supplies more of them, and retiring a field should be a stop-writing,
+    not a migration.
     """
 
-    #: The row references a person the roster does not contain. The action is a
-    #: question to the CRM team, not a transform change.
-    UNKNOWN_EMPLOYEE = "unknown_employee"
-    #: A parent the row hangs off — a program, a session — is not in `core`.
-    UNKNOWN_PARENT = "unknown_parent"
-    #: A categorical arrived with a value no mapping covers. The action is to
-    #: extend the mapping, which is why the raw value is kept verbatim.
-    UNMAPPED_CATEGORY = "unmapped_category"
-    #: A required field is absent or empty in the payload.
-    MISSING_REQUIRED = "missing_required"
-    #: Present but unusable — a grade that will not parse, times that will not
-    #: subtract, a rating outside its scale.
-    INVALID_VALUE = "invalid_value"
-    #: The row collides with one already counted on the grain's unique key.
-    #: Duplicate badge scans land here rather than aborting the run.
-    DUPLICATE = "duplicate"
+    CUSTOMISED_DEPARTMENT = "customised_department"
+    TRAINER_NAME = "trainer_name"
 
 
-class Quarantine(Base):
-    """One row the transform refused, with enough context to act on it."""
+class _Authored:
+    """Author and validity columns, shared by every table in this schema.
 
-    __tablename__ = "quarantine"
+    A mixin rather than four copies, because the audit obligation (FR-C03,
+    NFR-07) is identical for all of them and a table that forgot one of these
+    columns would be the one nobody could explain.
+    """
+
+    #: The signed-in user who made the decision. Email rather than an internal
+    #: id: the IdP asserts it, it survives the person leaving, and it is what
+    #: an auditor can actually resolve to a human.
+    authored_by: Mapped[str] = mapped_column(String(320), nullable=False)
+    authored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    #: Null on the live row. Set when a newer row replaces this one, or when a
+    #: person retires the value deliberately.
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Why, in the author's words. Optional for an override, and the whole
+    #: point of a dismissal (FR-F03).
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ProgramOverride(Base, _Authored):
+    """One hand-supplied value for one program attribute (FR-C01 to FR-C05).
+
+    Never written back to the CRM. There is no CRM write client in this
+    codebase and that is the enforcement (FR-C05).
+    """
+
+    __tablename__ = "enrichment_program_override"
     __table_args__ = (
-        # The queue is read two ways and only two: "what is outstanding, worst
-        # first" and "everything wrong with this entity". Both start here.
+        # Exactly one live value per (program, field). The partial predicate is
+        # what lets the same pair recur through history once superseded — the
+        # same mechanism as `ops.alert_notification`'s live index.
         Index(
-            "ix_quarantine_open",
-            "source",
-            "entity",
-            "reason",
-            postgresql_where=text("NOT is_resolved"),
+            "uq_program_override_live",
+            "crm_program_id",
+            "field",
+            unique=True,
+            postgresql_where=text("superseded_at IS NULL"),
+        ),
+        Index("ix_program_override_program", "crm_program_id"),
+        {"schema": SCHEMA_APP},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+
+    #: Deliberately not a foreign key to `core.dim_program`. Enrichment must be
+    #: authorable for a program the transform has not reached yet, and dropping
+    #: and rebuilding `core` must never cascade into deleting L&D's decisions.
+    crm_program_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    field: Mapped[EnrichmentField] = mapped_column(
+        enum_column(EnrichmentField, "enrichment_field"), nullable=False
+    )
+    #: Text for every field. A department name and a trainer name are both
+    #: names, and typing this per field would mean a column per field, which
+    #: is the design this table exists to avoid.
+    value: Mapped[str] = mapped_column(String(300), nullable=False)
+
+    def __repr__(self) -> str:
+        state = "live" if self.superseded_at is None else "superseded"
+        return f"<ProgramOverride {self.crm_program_id} {self.field}={self.value!r} {state}>"
+
+
+class TrainerAlias(Base, _Authored):
+    """One observed trainer spelling, merged into one canonical trainer (P-04).
+
+    The CRM stores a trainer as free text on the session, so `Ahmed Nasr`,
+    `ahmed nasr` and `A. Nasr` arrive as three trainers. The transform gives
+    each distinct normalised spelling its own `dim_trainer` row — it must,
+    since guessing that two names are one person is not a machine's decision —
+    and a row here is a person saying "these two are the same". FR-B06.
+
+    Only human merges live here. The auto-created trainers are in `core`,
+    because they are derived and a rebuild reproduces them exactly; a merge is
+    a decision and a rebuild must not lose it.
+    """
+
+    __tablename__ = "trainer_alias"
+    __table_args__ = (
+        Index(
+            "uq_trainer_alias_live",
+            "normalised_name",
+            unique=True,
+            postgresql_where=text("superseded_at IS NULL"),
         ),
         {"schema": SCHEMA_APP},
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
-    source: Mapped[Source] = mapped_column(
-        _enum_column(Source, "quarantine_source"), nullable=False
-    )
-    entity: Mapped[Entity] = mapped_column(
-        _enum_column(Entity, "quarantine_entity"), nullable=False
-    )
-    reason: Mapped[QuarantineReason] = mapped_column(
-        _enum_column(QuarantineReason, "quarantine_reason"), nullable=False
+    #: The spelling as the conformer normalises it — case-folded, whitespace
+    #: collapsed, accents stripped. Matching on the raw string would need one
+    #: alias row per trailing space.
+    normalised_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: The trainer this spelling really means. A foreign key, unlike the
+    #: program override above: the target is a `core` row that the transform
+    #: itself created, so it cannot be authored ahead of the transform, and an
+    #: alias pointing at a trainer that no longer exists is a broken merge
+    #: rather than a pending one.
+    trainer_key: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA_CORE}.dim_trainer.trainer_key"), nullable=False
     )
 
-    #: The source's own id for the row, where it has one. Null when the row is
-    #: nested and unkeyed — a survey answer inside a program, say.
-    source_id: Mapped[str | None] = mapped_column(Text)
-    #: What was wrong, in a sentence a person can act on. "sector 'Fnance' is
-    #: not in the mapping" beats "validation failed".
-    detail: Mapped[str] = mapped_column(Text, nullable=False)
-    #: The offending fragment, verbatim. Not the whole program payload — the
-    #: attendance row, the answer, the user object — so the queue stays small
-    #: and the reader sees the thing itself rather than 90 kB around it.
-    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    def __repr__(self) -> str:
+        return f"<TrainerAlias {self.normalised_name!r} -> {self.trainer_key}>"
 
-    #: The run that rejected it, so the queue joins to the audit trail.
-    sync_run_id: Mapped[int | None] = mapped_column(BigInteger)
 
-    first_seen_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+class SurveyQuestionMap(Base, _Authored):
+    """Which of the five measured dimensions a survey question is asking about.
+
+    THIS TABLE EXISTS BECAUSE THE BRD'S ASSUMPTION WAS WRONG
+
+    BRD §8.2 specifies `q1` to `q5` on `fact_evaluation`, and §9 defines four
+    quality metrics and NPS as counts over them. That presumes one fixed survey
+    across all programs. The live API gives each program its own `survey`, with
+    its own `question_id`s and its own option values, and nothing in the
+    payload says which question is the facilitator question.
+
+    So the association is a decision, and decisions live in `app`. Without a
+    row here a scored answer cannot be attributed to a metric, and the
+    transform raises SURVEY_QUESTION_UNMAPPED rather than guessing — a guess
+    would silently move four published percentages and NPS.
+
+    `scale_max` is carried because the recommend question is conventionally
+    0-10 while the quality questions are 1-5, and the band boundaries are
+    meaningless without knowing which.
+    """
+
+    __tablename__ = "survey_question_map"
+    __table_args__ = (
+        Index(
+            "uq_survey_question_map_live",
+            "crm_survey_id",
+            "crm_question_id",
+            unique=True,
+            postgresql_where=text("superseded_at IS NULL"),
+        ),
+        # A question id is only unique within its survey — the live fixtures
+        # show a survey question and an assessment question both numbered 42 —
+        # so the survey is part of the key, not context.
+        CheckConstraint("scale_max > scale_min", name="ck_survey_question_map_scale_ordered"),
+        {"schema": SCHEMA_APP},
     )
-    #: Resolved by a fix at source, or by an enrichment override. Kept rather
-    #: than deleted: "this was wrong for three weeks and then fixed" is the
-    #: history that tells you whether data quality is improving.
-    is_resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    resolved_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+
+    crm_survey_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    crm_question_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: Kept as a denormalised copy so the mapping screen can show what was
+    #: mapped without joining back through `raw`, and so a question whose
+    #: wording changed at source is visible as a mismatch.
+    question_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    dimension: Mapped[EvaluationDimension] = mapped_column(
+        enum_column(EvaluationDimension, "evaluation_dimension"), nullable=False
+    )
+    scale_min: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("1"))
+    scale_max: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("5"))
+
+    def __repr__(self) -> str:
+        return (
+            f"<SurveyQuestionMap survey={self.crm_survey_id} "
+            f"q={self.crm_question_id} -> {self.dimension}>"
+        )
+
+
+class SurveyOptionScore(Base, _Authored):
+    """The numeric value of one selectable answer.
+
+    A `select` answer arrives as the option's text — "Very useful" — and a
+    percentage of respondents scoring four or better cannot be computed from a
+    string. Which words mean four is a judgement about a particular survey's
+    wording, so it is authored rather than inferred: a lexicon mapping
+    "Very useful" to 5 would be right until the day a survey offers
+    "Somewhat useful" as its top option.
+
+    Not needed for `rating` answers, which arrive numeric.
+    """
+
+    __tablename__ = "survey_option_score"
+    __table_args__ = (
+        Index(
+            "uq_survey_option_score_live",
+            "crm_question_id",
+            "crm_option_id",
+            unique=True,
+            postgresql_where=text("superseded_at IS NULL"),
+        ),
+        {"schema": SCHEMA_APP},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+
+    crm_question_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    crm_option_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    option_value: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    score: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<SurveyOptionScore q={self.crm_question_id} {self.option_value!r}={self.score}>"
+
+
+class IdentityMapping(Base, _Authored):
+    """A person, mapped by hand to an employee the automatic rules missed.
+
+    The BRD calls this `identity_resolution`. FR-B04's three probes — employee
+    code, then email, then normalised name — resolve most attendees; a
+    contractor, a new hire with no code yet, or someone whose CRM user record
+    was never created resolves to nobody. FR-B05 says quarantine, never drop,
+    and FR-F03 says an operator may resolve the exception by mapping to an
+    existing entity. This is that mapping.
+
+    It is deliberately a *fourth probe* rather than a correction applied after
+    the fact: the transform consults it in the same pass as the other three, so
+    a mapped attendee's history is rebuilt correctly on the next run rather
+    than needing a patch.
+    """
+
+    __tablename__ = "identity_mapping"
+    __table_args__ = (
+        Index(
+            "uq_identity_mapping_live",
+            "source_odoo_id",
+            unique=True,
+            postgresql_where=text("superseded_at IS NULL"),
+        ),
+        CheckConstraint("source_odoo_id <> target_odoo_id", name="ck_identity_mapping_not_self"),
+        {"schema": SCHEMA_APP},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+
+    #: The unresolvable identifier as it appears on the attendance row.
+    source_odoo_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: The `odoo_id` of the person it really is. Points at the natural key
+    #: rather than at `dim_employee.employee_key`, because that surrogate names
+    #: one *version* of the person and a mapping is about the person.
+    target_odoo_id: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<IdentityMapping {self.source_odoo_id} -> {self.target_odoo_id}>"

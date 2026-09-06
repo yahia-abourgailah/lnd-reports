@@ -1,117 +1,95 @@
-"""Normalising categoricals, once, on the way in.
+"""Conformance: making unlike spellings of one thing into one thing (FR-B07).
 
-Every function here is total: it returns a conformed value or it says why it
-could not, and it never guesses. A conformer that quietly returned "Unknown"
-would put a category nobody chose into the dimension and remove any chance of
-noticing the source had changed.
+This module is the fix for two of the workbook's defects, and both of them are
+the same mistake made about different columns:
 
-The pattern is the same throughout. `conform_x` returns `(value, problem)`:
-exactly one is set. The caller counts the value or quarantines the problem, and
-because there is no third outcome, `received = counted + quarantined` holds by
-construction rather than by discipline.
+    P-05  `Projects` and `Projects ` became two rows in the sector pivot,
+          because a trailing space is invisible and a GROUP BY is not.
+          Measured on live data: 940 of 1,052 user objects carry a trailing
+          space, and 28 distinct raw values collapse to 23 once trimmed. Five
+          of the sectors in the workbook's breakdown do not exist.
+
+    P-04  `Ahmed Nasr`, `ahmed nasr` and `A. Nasr` became three trainers, so
+          one person's NPS was reported three times over three subsets of
+          their own responses.
+
+NORMALISE FOR MATCHING, DISPLAY WHAT ARRIVED
+
+Every function here produces a *matching* key, and none of them produces a
+value to show anyone. `normalise("Ahmed  NASR")` is `ahmed nasr`, which is
+correct for deciding two strings are the same person and wrong for putting on a
+scorecard. So the model stores both: `dim_trainer.normalised_name` beside
+`canonical_name`, `dim_session.trainer_name_raw` beside `trainer_key`. When
+somebody asks why two trainers merged, the evidence is still in the row.
+
+WHAT NORMALISATION DELIBERATELY DOES NOT DO
+
+It does not decide that `A. Nasr` and `Ahmed Nasr` are one person. Initials,
+nicknames and transliterations are a judgement, and a fuzzy matcher that got it
+right nine times in ten would silently merge two real people the tenth time —
+a worse failure than the one it fixes, because nothing would show it happened.
+Those merges are authored in `app.trainer_alias` by a person. This module only
+removes differences that carry no information: case, accents, and whitespace.
 """
 
 from __future__ import annotations
 
+import re
 import unicodedata
-from dataclasses import dataclass
+from typing import Any
 
-from lnd.models.app_ import QuarantineReason
+from lnd.ingest.hashing import payload_hash
 
-
-@dataclass(frozen=True)
-class Problem:
-    """Why a value could not be conformed, in terms the queue groups by."""
-
-    reason: QuarantineReason
-    detail: str
+#: Runs of any whitespace, including the non-breaking spaces that arrive from
+#: copy-paste into the CRM's own admin screens.
+_WHITESPACE = re.compile(r"\s+")
 
 
-def conform_optional_text(value: object) -> str | None:
-    """Trim, collapse inner runs of whitespace, and treat empty as absent.
+def trim(value: str | None) -> str | None:
+    """Strip surrounding whitespace, and treat an empty string as absent.
 
-    Applied to every free-text categorical before it reaches a dimension. It is
-    the single most valuable rule in this module, because whitespace damage is
-    invisible in every tool a person would check with: `"Finance "` and
-    `"Finance"` render identically in a spreadsheet, a psql result and a JSON
-    dump, and group separately in every one of them.
-
-    That is not hypothetical here. `user.sector` arrived with a trailing space
-    on 940 of 1,052 records (P-05), turning 23 real sectors into 28. The CRM
-    team has since fixed it at source — the live roster now measures zero — but
-    the trim stays. A conformer that was removed because the source was fixed is
-    a conformer that will be missing the next time the source regresses, and
-    the cost of keeping it is one function call.
-
-    NFKC first, so a non-breaking space and a full-width character conform to
-    the ASCII forms everything else is compared against.
+    The second half matters as much as the first. A `sector` of `""` and a
+    `sector` of `None` mean the same thing — nobody recorded one — and if they
+    are stored differently the coverage view grows an empty-string sector that
+    nothing can be done about.
     """
     if value is None:
         return None
-    text = unicodedata.normalize("NFKC", str(value))
-    collapsed = " ".join(text.split())
-    return collapsed or None
+    stripped = _WHITESPACE.sub(" ", value).strip()
+    return stripped or None
 
 
-def conform_sector(value: object) -> tuple[str | None, Problem | None]:
-    """A sector, or the reason it is not one.
+def normalise(value: str | None) -> str | None:
+    """A matching key: accent-stripped, case-folded, whitespace-collapsed.
 
-    Absent is legitimate — not every employee record carries a sector — so a
-    null returns cleanly rather than as a problem. What does not return cleanly
-    is a value that is present but unusable, because that is a source change
-    somebody needs to see.
+    `casefold` rather than `lower`, because it is the operation defined for
+    comparison rather than for display, and the two differ for scripts this
+    dataset will eventually contain.
+
+    NFKD then dropping combining marks folds `Ahmèd` onto `ahmed`. That is the
+    right call for a workforce whose names are transliterated inconsistently
+    between systems: the accent is a property of one system's keyboard, not of
+    the person.
     """
-    conformed = conform_optional_text(value)
-    if conformed is None:
-        return None, None
-    if len(conformed) > 128:
-        return None, Problem(
-            QuarantineReason.INVALID_VALUE,
-            f"sector is {len(conformed)} characters, which is a payload shape change, not a sector",
-        )
-    return conformed, None
+    trimmed = trim(value)
+    if trimmed is None:
+        return None
+    decomposed = unicodedata.normalize("NFKD", trimmed)
+    without_marks = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return without_marks.casefold()
 
 
-def conform_grade(value: object) -> tuple[int | None, Problem | None]:
-    """Job level grade as an integer.
+def attribute_hash(attributes: dict[str, Any]) -> str:
+    """Fingerprint a dimension row's attributes, for change detection.
 
-    The source sends it as text, which is why the workbook sorted `"10"` before
-    `"9"`. Casting here means no query can re-derive it differently.
+    The same function the raw layer uses on payloads, applied one layer up:
+    it is what decides whether re-reading an unchanged person opens a new SCD
+    version or does nothing at all. Using `payload_hash` rather than a second
+    implementation means the two layers cannot disagree about whether
+    something changed — and a second implementation is exactly how they would.
 
-    Two spellings are in circulation and both are accepted: the API document
-    describes `"G7"`, the live payload returns `"9"`. Accepting the documented
-    form as well costs one line and means the transform does not break on the
-    day the CRM starts sending what its own document promises.
+    Only the attributes are hashed. Never `valid_from`, never `transformed_at`:
+    a hash that included the time would differ on every pass and open a new
+    version of every employee every thirty minutes.
     """
-    if value is None:
-        return None, None
-    text = conform_optional_text(value)
-    if text is None:
-        return None, None
-
-    digits = text[1:] if len(text) > 1 and text[0] in {"G", "g"} else text
-    try:
-        grade = int(digits)
-    except ValueError:
-        return None, Problem(
-            QuarantineReason.INVALID_VALUE,
-            f"job_level_grade {text!r} is not a number and not a G-prefixed grade",
-        )
-    # 0 is a sentinel, not a grade, and it is not an error either. Every one of
-    # the 20 employees carrying it has `job_level_name = "Freelancer"`, and
-    # every Freelancer carries it — they sit outside the internal ladder rather
-    # than at the bottom of it. Null is the honest grade; `job_level_name` still
-    # says what they are, so nothing is lost.
-    #
-    # Quarantining them, which is what this did first, was the more expensive
-    # mistake: they are active employees, so removing them from the dimension
-    # would have quietly cut 20 people out of the participation denominator —
-    # the exact class of silent shortfall this pipeline exists to prevent.
-    if grade == 0:
-        return None, None
-    if grade < 0:
-        return None, Problem(
-            QuarantineReason.INVALID_VALUE,
-            f"job_level_grade {text!r} is negative, which no ladder has",
-        )
-    return grade, None
+    return payload_hash(attributes)

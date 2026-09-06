@@ -54,6 +54,15 @@ celery_app.conf.update(
             "task": "lnd.sync.full_reconcile",
             "schedule": crontab(hour="2", minute="15"),
         },
+        # Five minutes behind the sync, so a pass reads what the sync it
+        # follows has landed rather than racing it. They are separate tasks
+        # rather than one chained job on purpose: the transform reads only
+        # `raw`, so it must still run — and still produce a correct `core` —
+        # on a morning when the CRM is down and no sync succeeded at all.
+        "transform-core": {
+            "task": "lnd.transform.core",
+            "schedule": crontab(minute="5,35"),
+        },
         "report-monthly": {
             "task": "lnd.reports.monthly",
             # 07:00 on the first of the month, after the nightly reconcile.
@@ -109,6 +118,20 @@ def sync_full_reconcile() -> dict[str, int]:
     from lnd.sync.runner import configured_pullers, run_all, summarise
 
     return summarise(run_all(configured_pullers(), mode=SyncMode.FULL_RECONCILE))
+
+
+@celery_app.task(name="lnd.transform.core")
+def transform_core() -> dict[str, int]:
+    """Rebuild `core` from `raw` (FR-B01 to FR-B08).
+
+    One transaction for the whole pass. A partial `core` — programs loaded,
+    attendance missing — would halve every hour metric with nothing to say so,
+    which is worse than serving the previous coherent version for another half
+    hour.
+    """
+    from lnd.transform.runner import run_transform
+
+    return run_transform().as_dict()
 
 
 @celery_app.task(name="lnd.reports.monthly")

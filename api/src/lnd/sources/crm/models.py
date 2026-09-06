@@ -142,12 +142,26 @@ class User(CrmModel):
     @field_validator("job_level_grade", mode="before")
     @classmethod
     def _grade_to_int(cls, value: Any) -> Any:
+        """Text to integer, and 0 to absent.
+
+        0 is a sentinel rather than a rung. Measured on the live roster: all 20
+        people carrying it have `job_level_name = "Freelancer"`, and every
+        Freelancer carries it — they sit outside the internal ladder rather than
+        at the bottom of it. `job_level_name` still says what they are, so
+        nothing is lost by storing no grade.
+
+        The alternative was rejecting them, which is worse than it sounds: they
+        are active employees, so dropping them would quietly remove 20 people
+        from the participation denominator.
+        """
         if value is None or value == "":
             return None
         if isinstance(value, str):
             stripped = value.strip()
-            return int(stripped) if stripped.lstrip("-").isdigit() else value
-        return value
+            if not stripped.lstrip("-").isdigit():
+                return value
+            value = int(stripped)
+        return None if value == 0 else value
 
     @property
     def sector_conformed(self) -> str | None:
