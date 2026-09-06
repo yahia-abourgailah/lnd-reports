@@ -204,17 +204,34 @@ def load_employees(
     to_insert: list[dict[str, object]] = []
     unchanged = 0
 
-    known_roster = {
-        odoo_id
-        for (odoo_id,) in session.execute(
-            select(DimEmployee.odoo_id)
-            .where(DimEmployee.is_current)
-            .where(DimEmployee.on_current_roster)
-        ).all()
-    }
+    # What each person's flag is now, for the case where no roster was read.
+    # Absent from this map means the person is new.
+    known_roster: dict[str, bool] = {}
+    for row in session.execute(
+        select(DimEmployee.odoo_id, DimEmployee.on_current_roster).where(DimEmployee.is_current)
+    ).all():
+        known_roster[row.odoo_id] = row.on_current_roster
+
+    def still_on_roster(odoo_id: str) -> bool:
+        """Whether `get_users` returns this person.
+
+        `roster_ids is None` means no roster was read at all — the employee sync
+        has not run, or this is a program-only load. That is not evidence that
+        anybody has left, so the existing flag stands and somebody new defaults
+        to present.
+
+        Defaulting a new person to False instead, which this did first, marks
+        the entire workforce as departed on any pass without a roster and takes
+        the participation denominator to zero. The failure is silent: every
+        headcount reads 0 and every rate becomes undefined, with nothing to say
+        the roster simply was not there.
+        """
+        if roster_ids is not None:
+            return odoo_id in roster_ids
+        return known_roster.get(odoo_id, True)
 
     for odoo_id, user in users.items():
-        on_roster = odoo_id in roster_ids if roster_ids is not None else odoo_id in known_roster
+        on_roster = still_on_roster(odoo_id)
         attributes = attributes_of(user, on_current_roster=on_roster)
         digest = attribute_hash(attributes)
 
