@@ -165,6 +165,10 @@ def loaded(core_db: Session) -> Session:
     be in the denominator — and they must not be in the numerator either, which
     is the correction P-13 names.
     """
+    # The mapping is seeded by migration 0009, and `core_db` truncates it along
+    # with everything else — so it is restored here rather than invented. Using
+    # the same five rows the migration ships means these tests exercise the
+    # mapping that production will actually run on.
     for question_id, dimension, low, high in (
         (3, EvaluationDimension.KNOWLEDGE_RELEVANCE, 1, 5),
         (7, EvaluationDimension.RECOMMEND, 0, 10),
