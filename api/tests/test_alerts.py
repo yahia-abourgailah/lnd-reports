@@ -148,13 +148,15 @@ class TestRules:
 
     def test_a_fresh_install_reports_every_expected_entity(self, live_db: None) -> None:
         """Nothing has ever synced, and the catalogue is what makes that
-        visible rather than silent."""
+        visible rather than silent.
+
+        Two entities, not six. Sessions, enrollments, attendance and
+        evaluations arrive nested inside the program payload, so no sync run
+        exists for them and none ever will — declared here they alerted forever
+        against a condition no pull could satisfy.
+        """
         assert _keys() == {
             "never_synced:crm:program",
-            "never_synced:crm:session",
-            "never_synced:crm:enrollment",
-            "never_synced:crm:attendance",
-            "never_synced:crm:evaluation",
             "never_synced:crm:employee",
         }
 

@@ -94,15 +94,24 @@ class TestCatalogue:
         reported = _entity(_report(), Source.LINKEDIN, Entity.COURSE_COMPLETION)
         assert reported.status == "ok"
 
+    def test_only_what_the_platform_fetches_is_declared(self) -> None:
+        """The catalogue is what is pulled, not what is held.
+
+        One request returns a whole program tree, so sessions, enrollments,
+        attendance and evaluations have no sync of their own to be fresh or
+        stale relative to. Whether they transformed correctly is the transform
+        invariant's question and is asked per grain before every commit.
+        """
+        assert {entity for _, entity in EXPECTED_ENTITIES} == {
+            Entity.PROGRAM,
+            Entity.EMPLOYEE,
+        }
+
     def test_entities_are_ordered_by_the_pipeline_not_the_alphabet(self) -> None:
         ordered = sorted(EXPECTED_ENTITIES, key=ordering_key)
 
         assert [entity for source, entity in ordered if source is CRM] == [
             Entity.PROGRAM,
-            Entity.SESSION,
-            Entity.ENROLLMENT,
-            Entity.ATTENDANCE,
-            Entity.EVALUATION,
             Entity.EMPLOYEE,
         ]
 
