@@ -47,9 +47,26 @@ from lnd.metrics.filters import MetricFilters
 #: The window the workbook covers, and the only like-for-like comparison.
 WORKBOOK = MetricFilters(date_from=date(2026, 2, 1), date_to=date(2026, 8, 31))
 
+#: Past every session the dataset holds, so nothing is excluded — its job is to
+#: pin the clock, not to narrow anything.
+#:
+#: A frozen dataset has to produce frozen values, and one metric quietly broke
+#: that: Months Since Last Training measures back from `date_to`, and with no
+#: `date_to` it measures back from today. The golden file recorded 4.93 and the
+#: gate failed the next morning at 4.96 — a red build caused by the calendar,
+#: which is the fastest way to teach a team to ignore a red build.
+#:
+#: Deliberately not "today" and not the freeze date. Either would reintroduce
+#: the same drift one level up, where it is harder to see.
+AS_OF = date(2026, 12, 31)
+
 #: Everything the CRM holds. What the platform publishes; not comparable to the
 #: workbook's column without saying so.
-FULL = MetricFilters()
+#:
+#: The live API sends no `date_to` by default and so does measure recency from
+#: today, which is correct there — a dashboard should say how long ago, not how
+#: long before a fixed date. Only the reference window is pinned.
+FULL = MetricFilters(date_to=AS_OF)
 
 #: What the reconciliation walks, in the order it presents them.
 WINDOWS: tuple[tuple[str, MetricFilters], ...] = (

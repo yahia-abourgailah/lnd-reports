@@ -43,6 +43,7 @@ from sqlalchemy.orm import Session
 from lnd.db import session_scope
 from lnd.ingest.landing import current
 from lnd.ingest.models import Entity, RawRecord, Source
+from lnd.metrics.cache import invalidate as invalidate_metrics_cache
 from lnd.sources.crm.models import Program, User
 from lnd.transform.dates import ensure_covering
 from lnd.transform.employees import load_employees
@@ -295,11 +296,24 @@ def run_transform(*, source_ids: list[str] | None = None) -> TransformResult:
         )
         raise
 
+    # After the commit, never before. `core` is rebuilt wholesale by a pass, so
+    # every cached aggregate becomes suspect at the same instant — but only once
+    # the new rows are actually visible. Bumping first would let a request
+    # in-flight repopulate the new generation from the old data and pin it there
+    # until the next pass, which is a stale figure that looks current: the one
+    # failure a cache must not have.
+    #
+    # A rollback reaches this line only by not reaching it: InvariantViolation
+    # re-raises above, so a failed pass leaves the generation where it was and
+    # the cache keeps serving figures that still match what is in `core`.
+    generation = invalidate_metrics_cache()
+
     log.info(
         "transform pass finished",
         extra={
             "event": "transform.finished",
             "duration_seconds": (datetime.now(UTC) - started).total_seconds(),
+            "cache_generation": generation,
         },
     )
     return result

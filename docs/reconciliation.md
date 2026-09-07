@@ -4,7 +4,7 @@
      every figure and every explanation comes from the metric registry, and a
      hand-edit would drift from the code it is supposed to describe. -->
 
-Generated 2026-09-06 from the metric registry against the frozen reference dataset.
+Generated 2026-09-07 from the metric registry against the frozen reference dataset.
 
 ## The rule this is written under
 
@@ -244,7 +244,7 @@ July 2025 to September 2026. **Not comparable to the workbook column** — it co
 | Fill Rate | 68.4% | 70.9% | 55 |
 | Survey Response Rate | 38.8% | 45.7% | 650 |
 | Coverage Gap | 1,320 | 1,254 | 1,455 |
-| Months Since Last Training | 2.3 months | 4.9 months | 287 |
+| Months Since Last Training | 2.3 months | 5.0 months | 287 |
 | LinkedIn Hours | — | — | — |
 | Blended Learner Hours | — | — | — |
 | Unique Reach | — | — | — |
