@@ -11,11 +11,12 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { NavLink, Route, Routes } from 'react-router-dom'
+import { NavLink, Route, Routes, useLocation } from 'react-router-dom'
 
 import { getAuthStatus, getKpis, getMe, logout, Unauthorized } from './api'
 import { FilterBar } from './components/FilterBar'
 import { FreshnessBadge } from './components/FreshnessBadge'
+import { Enrichment } from './components/Enrichment'
 import { Kpis } from './components/Kpis'
 import { useFilters } from './filters'
 
@@ -42,6 +43,11 @@ function SignIn({ loginUrl, mode }: { loginUrl: string; mode: string }) {
 function Dashboard() {
   const queryClient = useQueryClient()
   const filters = useFilters()
+  // The bar is identical on every view that reads numbers, and absent from
+  // the one that does not. A filter control that renders but changes nothing
+  // is worse than no control: it invites somebody to narrow a screen and
+  // conclude the data is missing.
+  const analytical = useLocation().pathname !== '/enrichment'
   const me = useQuery({ queryKey: ['me'], queryFn: getMe })
 
   // The badge reads the envelope of the request the page already made, rather
@@ -65,6 +71,7 @@ function Dashboard() {
             <NavLink to="/" end>
               Overview
             </NavLink>
+            <NavLink to="/enrichment">Enrichment</NavLink>
           </nav>
 
           <div className="chrome-right">
@@ -82,12 +89,13 @@ function Dashboard() {
           </div>
         </div>
 
-        <FilterBar filters={filters} />
+        {analytical && <FilterBar filters={filters} />}
       </header>
 
       <main className="content">
         <Routes>
           <Route path="/" element={<Kpis filters={filters} />} />
+          <Route path="/enrichment" element={<Enrichment />} />
           <Route
             path="*"
             element={<p className="muted">That screen does not exist yet.</p>}

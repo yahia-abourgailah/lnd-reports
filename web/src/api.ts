@@ -166,3 +166,59 @@ export const getBreakdown = (key: string, by: string, query: string) =>
   api<BreakdownResponse>(`/kpis/${key}/breakdown${query ? `${query}&` : '?'}by=${by}`)
 export const getTrend = (key: string, query: string) =>
   api<TrendResponse>(`/kpis/${key}/trend${query}`)
+
+export interface DrillResponse {
+  metric_key: string
+  metric: Metric
+  grain: string
+  columns: string[]
+  rows: Record<string, unknown>[]
+  total: number
+  returned: number
+  truncated: boolean
+  filters_applied: string
+}
+
+export interface OverlayEntry {
+  id: number
+  kind: string
+  key: Record<string, unknown>
+  values: Record<string, unknown>
+  authored_by: string
+  authored_at: string
+  superseded_at: string | null
+  is_live: boolean
+  note: string | null
+}
+
+export const getDrill = (key: string, query: string, limit = 500) =>
+  api<DrillResponse>(`/drill/${key}${query ? `${query}&` : '?'}limit=${limit}`)
+
+export const getOverlay = (kind: string) =>
+  api<{ kind: string; entries: OverlayEntry[] }>(`/enrichment/${kind}`)
+
+export const getOverlayHistory = (kind: string, key: Record<string, unknown>) =>
+  api<{ kind: string; entries: OverlayEntry[] }>(`/enrichment/${kind}/history`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key }),
+  })
+
+export const putOverlay = (
+  kind: string,
+  key: Record<string, unknown>,
+  values: Record<string, unknown>,
+  note: string | null,
+) =>
+  api<OverlayEntry>(`/enrichment/${kind}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, values, note }),
+  })
+
+export const retireOverlay = (kind: string, key: Record<string, unknown>, note: string | null) =>
+  api<OverlayEntry | null>(`/enrichment/${kind}/retire`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, note }),
+  })

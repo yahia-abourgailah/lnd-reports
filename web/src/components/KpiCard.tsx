@@ -21,6 +21,7 @@
 import { useId, useState } from 'react'
 
 import type { Metric } from '../api'
+import { TrendChart } from './TrendChart'
 
 const PROVENANCE_LABEL: Record<Metric['provenance'], string | null> = {
   unchanged: null,
@@ -39,7 +40,15 @@ function sampleWording(metric: Metric): string {
   return `${metric.sample_size.toLocaleString()} rows`
 }
 
-export function KpiCard({ metric }: { metric: Metric }) {
+export function KpiCard({
+  metric,
+  query,
+  onDrill,
+}: {
+  metric: Metric
+  query: string
+  onDrill: (key: string) => void
+}) {
   const [open, setOpen] = useState(false)
   const tooltipId = useId()
   const changed = PROVENANCE_LABEL[metric.provenance]
@@ -60,12 +69,25 @@ export function KpiCard({ metric }: { metric: Metric }) {
         </button>
       </header>
 
-      <p className={`kpi-value kpi-${metric.unit}`}>{metric.formatted}</p>
+      {/* The number is the control. Clicking it opens the rows it is made of,
+          which is the whole answer to "unauditable": you can read the result
+          and now also the question. */}
+      <button
+        type="button"
+        className={`kpi-value kpi-${metric.unit}`}
+        onClick={() => onDrill(metric.key)}
+        disabled={metric.value === null}
+        title={metric.value === null ? undefined : `Show the ${metric.sample_size} rows behind this`}
+      >
+        {metric.formatted}
+      </button>
 
       <p className="kpi-sample">
         {metric.value === null ? 'no measurement yet' : sampleWording(metric)}
         {metric.is_estimated && <span className="kpi-flag"> · estimated</span>}
       </p>
+
+      {metric.value !== null && <TrendChart metricKey={metric.key} query={query} />}
 
       {changed && <span className={`tag tag-${metric.provenance}`}>{changed}</span>}
 

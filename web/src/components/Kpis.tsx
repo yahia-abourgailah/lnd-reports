@@ -12,9 +12,12 @@
  */
 
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 
 import { getKpis, type Metric } from '../api'
 import type { Filters } from '../filters'
+import { DrillDrawer } from './DrillDrawer'
+import { ExclusionBanner } from './ExclusionBanner'
 import { KpiCard } from './KpiCard'
 
 const GROUPS: { provenance: Metric['provenance'][]; title: string; note: string }[] = [
@@ -37,6 +40,7 @@ const GROUPS: { provenance: Metric['provenance'][]; title: string; note: string 
 ]
 
 export function Kpis({ filters }: { filters: Filters }) {
+  const [drilling, setDrilling] = useState<string | null>(null)
   const kpis = useQuery({
     queryKey: ['kpis', filters.query],
     queryFn: () => getKpis(filters.query),
@@ -57,14 +61,9 @@ export function Kpis({ filters }: { filters: Filters }) {
             <span className="scope-filtered"> · filtered by {dimensions_filtered.join(', ')}</span>
           )}
         </p>
-        {/* Never hidden, even at zero. A dashboard that mentions excluded rows
-            only when there are some teaches nobody to look for the number. */}
-        <p className="scope-excluded">
-          {excluded_count === 0
-            ? 'Every row was counted.'
-            : `${excluded_count} row(s) could not be placed and are excluded.`}
-        </p>
       </div>
+
+      <ExclusionBanner count={excluded_count} />
 
       {GROUPS.map((group) => {
         const shown = metrics.filter((m) => group.provenance.includes(m.provenance))
@@ -77,12 +76,25 @@ export function Kpis({ filters }: { filters: Filters }) {
             </div>
             <div className="kpi-grid">
               {shown.map((metric) => (
-                <KpiCard key={metric.key} metric={metric} />
+                <KpiCard
+                  key={metric.key}
+                  metric={metric}
+                  query={filters.query}
+                  onDrill={setDrilling}
+                />
               ))}
             </div>
           </section>
         )
       })}
+
+      {drilling && (
+        <DrillDrawer
+          metricKey={drilling}
+          query={filters.query}
+          onClose={() => setDrilling(null)}
+        />
+      )}
     </>
   )
 }
