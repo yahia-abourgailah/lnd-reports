@@ -461,6 +461,9 @@ button.kpi-value:disabled { color: var(--ink-3); font-weight: 400; cursor: defau
   background: currentcolor; transform: translateY(-1px);
 }
 .exclusion-clear { background: var(--ok-soft); color: var(--ok); }
+/* The flagged count sits inside the banner but must not read as part of the
+   headline claim — it is context, not a loss. */
+.exclusion-aside { opacity: 0.82; }
 .exclusion-some { background: var(--warn-soft); color: var(--warn); }
 
 /* ------------------------------------------------------------- the drawer */

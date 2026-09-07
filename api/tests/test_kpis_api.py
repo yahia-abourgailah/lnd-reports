@@ -9,6 +9,7 @@ being sent, or a refusal that turns into a plausible wrong answer.
 
 from __future__ import annotations
 
+import datetime as dt
 from collections.abc import Iterator
 from typing import Any
 
@@ -96,6 +97,50 @@ class TestTheEnvelope:
     ) -> None:
         """A dashboard that silently omits rows is the workbook."""
         assert body(dashboard, "/v1/kpis")["excluded_count"] >= 0
+
+    def test_flagged_rows_are_not_reported_as_excluded(
+        self, dashboard: TestClient, live_db: None
+    ) -> None:
+        """Two things share `ops.dq_exception` and only one costs a figure.
+
+        A session whose times will not subtract is kept out of both hour
+        metrics; a programme over capacity is counted in full and is merely
+        worth knowing. Counting both as losses understates coverage (FR-F04) —
+        and on live data it did, announcing three records excluded when the
+        true number was zero. Wrong in the direction that sounds careful is
+        still wrong: a reader who trusts it then distrusts complete figures.
+        """
+        from lnd.db import session_scope
+        from lnd.models.ops import DqDisposition, DqException, DqRule, DqStatus
+
+        # Measured as a delta. The transformed programme already raises a
+        # CAPACITY_EXCEEDED of its own, and a test that assumed an empty queue
+        # would pass today and break the first time a rule started firing —
+        # for a reason unrelated to what it is checking.
+        before = body(dashboard, "/v1/kpis")
+
+        now = dt.datetime.now(dt.UTC)
+        with session_scope() as session:
+            for rule, disposition in (
+                (DqRule.CAPACITY_EXCEEDED, DqDisposition.COUNTED),
+                (DqRule.DURATION_UNDERIVABLE, DqDisposition.QUARANTINED),
+            ):
+                session.add(
+                    DqException(
+                        exception_key=f"{rule.value}:93",
+                        rule=rule,
+                        disposition=disposition,
+                        status=DqStatus.OPEN,
+                        crm_program_id=93,
+                        summary="fixture",
+                        first_seen_at=now,
+                        last_seen_at=now,
+                    )
+                )
+
+        after = body(dashboard, "/v1/kpis")
+        assert after["excluded_count"] - before["excluded_count"] == 1
+        assert after["flagged_count"] - before["flagged_count"] == 1
 
     def test_a_metric_ships_with_its_definition_and_population(self, dashboard: TestClient) -> None:
         """The tooltip reads these. A number and its definition ship together

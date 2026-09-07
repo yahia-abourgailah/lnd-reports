@@ -118,7 +118,10 @@ interface Envelope {
   freshness: Freshness
   filters_applied: string
   dimensions_filtered: string[]
+  /** Rows a data-quality rule keeps out of the figures. */
   excluded_count: number
+  /** Rows a rule flagged and still counted — never presented as a loss. */
+  flagged_count: number
   cached: boolean
 }
 

@@ -50,7 +50,8 @@ export function Kpis({ filters }: { filters: Filters }) {
   if (kpis.isError) return <p className="warn">The metrics could not be computed.</p>
   if (!kpis.data) return null
 
-  const { metrics, excluded_count, filters_applied, dimensions_filtered } = kpis.data
+  const { metrics, excluded_count, flagged_count, filters_applied, dimensions_filtered } =
+    kpis.data
 
   return (
     <>
@@ -63,7 +64,7 @@ export function Kpis({ filters }: { filters: Filters }) {
         </p>
       </div>
 
-      <ExclusionBanner count={excluded_count} />
+      <ExclusionBanner excluded={excluded_count} flagged={flagged_count} />
 
       {GROUPS.map((group) => {
         const shown = metrics.filter((m) => group.provenance.includes(m.provenance))

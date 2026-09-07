@@ -244,20 +244,49 @@ def trend(metric_key: str, session: Session, filters: MetricFilters | None = Non
     )
 
 
-def excluded_count(session: Session) -> int:
-    """Rows kept out of every metric because they could not be resolved.
+@dataclass(frozen=True)
+class Completeness:
+    """What the data-quality queue costs the figures, and what it merely notes.
 
-    Returned on every response (FR-A05). A dashboard that silently omits rows
-    is the workbook; one that says "and 3 we could not place" is a platform.
+    Two very different things share `ops.dq_exception`, and conflating them is
+    the mistake this type exists to prevent. A DURATION_UNDERIVABLE session is
+    excluded from both hour metrics; a CAPACITY_EXCEEDED programme is counted
+    in full and is simply worth knowing about. Reporting both as losses
+    understates the platform's coverage (FR-F04) — and on the live data it did
+    exactly that, announcing "3 records could not be placed" when the true
+    number was zero.
+
+    A dashboard that silently omits rows is the workbook. One that claims to
+    omit rows it did not is worse, because it is wrong in the direction that
+    sounds careful.
     """
-    from lnd.models.ops import DqException, DqStatus
 
-    return int(
-        session.scalar(
-            select(func.count()).select_from(DqException).where(DqException.status == DqStatus.OPEN)
+    #: Rows the rule actually keeps out of the metrics it affects.
+    excluded: int
+    #: Rows flagged and still counted. Worth surfacing, never as a loss.
+    flagged: int
+
+
+def completeness(session: Session) -> Completeness:
+    """The open queue, split by what it did to the numbers (FR-A05, FR-F04)."""
+    from lnd.models.ops import DqDisposition, DqException, DqStatus
+
+    def count(disposition: DqDisposition) -> int:
+        return int(
+            session.scalar(
+                select(func.count())
+                .select_from(DqException)
+                .where(
+                    DqException.status == DqStatus.OPEN,
+                    DqException.disposition == disposition,
+                )
+            )
+            or 0
         )
-        or 0
+
+    return Completeness(
+        excluded=count(DqDisposition.QUARANTINED), flagged=count(DqDisposition.COUNTED)
     )
 
 
-__all__ = ["Breakdown", "Slice", "Trend", "breakdown", "excluded_count", "trend"]
+__all__ = ["Breakdown", "Completeness", "Slice", "Trend", "breakdown", "completeness", "trend"]

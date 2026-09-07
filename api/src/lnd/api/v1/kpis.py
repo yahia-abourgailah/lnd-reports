@@ -74,7 +74,12 @@ class Envelope(BaseModel):
     freshness: FreshnessResponse
     filters_applied: str
     dimensions_filtered: list[str]
+    #: Rows a data-quality rule keeps out of the figures.
     excluded_count: int
+    #: Rows a rule flagged and still counted. Reported separately because
+    #: calling them excluded understates the platform's coverage — and says
+    #: something untrue in the direction that sounds careful.
+    flagged_count: int
     cached: bool
 
 
@@ -177,11 +182,13 @@ FilterParams = Annotated[MetricFilters, Depends(_filters)]
 
 
 def _envelope(session: Session, filters: MetricFilters, *, was_cached: bool) -> dict[str, Any]:
+    quality = aggregate.completeness(session)
     return {
         "freshness": platform_freshness(session),
         "filters_applied": filters.describe(),
         "dimensions_filtered": sorted(d.value for d in filters.dimensions_used),
-        "excluded_count": aggregate.excluded_count(session),
+        "excluded_count": quality.excluded,
+        "flagged_count": quality.flagged,
         "cached": was_cached,
     }
 
