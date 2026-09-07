@@ -253,3 +253,134 @@ class TestAuthentication:
             "/v1/kpis/nps/breakdown?by=company",
         ):
             assert client.get(url).status_code == 401, url
+
+
+class TestDrillThrough:
+    """`/v1/drill/{key}` — the rows behind a number.
+
+    The guarantee is that `total` equals the metric's own sample. A
+    drill-through with its own idea of the population would agree the day it
+    was written and drift silently the first time a population rule was
+    corrected, because both numbers stay plausible.
+    """
+
+    def test_the_row_count_matches_the_metric(self, dashboard: TestClient) -> None:
+        for key in ("total_programs", "nps", "participation_rate", "total_participants"):
+            drilled = body(dashboard, f"/v1/drill/{key}")
+            assert drilled["total"] == drilled["metric"]["sample_size"], key
+
+    def test_it_returns_the_metric_beside_the_rows(self, dashboard: TestClient) -> None:
+        """So a mismatch between a figure and its rows is visible on one screen
+        rather than across two requests."""
+        drilled = body(dashboard, "/v1/drill/total_programs")
+
+        assert drilled["metric"]["key"] == "total_programs"
+        assert drilled["rows"][0]["title"] == "The Adaptive Leader"
+
+    def test_the_grain_is_the_metric_s_own(self, dashboard: TestClient) -> None:
+        assert body(dashboard, "/v1/drill/participation_rate")["grain"] == "employee"
+        assert body(dashboard, "/v1/drill/nps")["grain"] == "evaluation"
+
+    def test_a_truncated_list_says_so(self, dashboard: TestClient) -> None:
+        """A truncated list that looks complete is worse than no list."""
+        drilled = body(dashboard, "/v1/drill/total_participants?limit=1")
+
+        assert drilled["truncated"] is True
+        assert drilled["returned"] == 1
+        assert drilled["total"] > 1
+
+    def test_filters_narrow_the_rows_and_the_metric_together(self, dashboard: TestClient) -> None:
+        drilled = body(dashboard, "/v1/drill/total_participants?sector=Nowhere")
+
+        assert drilled["total"] == 0
+        assert drilled["rows"] == []
+
+    def test_it_refuses_what_the_metric_refuses(self, dashboard: TestClient) -> None:
+        """Showing rows the number was not computed over is a worse lie than
+        showing none."""
+        assert dashboard.get("/v1/drill/participation_rate?trainer=1").status_code == 422
+
+    def test_an_unknown_metric_is_a_404(self, dashboard: TestClient) -> None:
+        assert dashboard.get("/v1/drill/not_a_metric").status_code == 404
+
+    def test_it_requires_a_session(self, client: TestClient) -> None:
+        assert client.get("/v1/drill/nps").status_code == 401
+
+
+class TestEnrichmentApi:
+    def test_the_author_is_the_signed_in_user_not_the_request_body(
+        self, dashboard: TestClient
+    ) -> None:
+        """An audit trail a caller can address to somebody else is not an audit
+        trail."""
+        response = dashboard.put(
+            "/v1/enrichment/program_override",
+            json={
+                "key": {"crm_program_id": 93, "field": "trainer_name"},
+                "values": {"value": "Ahmed Elshiaty"},
+                "authored_by": "someone.else@example.com",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["authored_by"] == "specialist@example.com"
+
+    def test_a_change_is_visible_as_history(self, dashboard: TestClient) -> None:
+        key = {"crm_program_id": 93, "field": "trainer_name"}
+        for value in ("first", "second"):
+            dashboard.put(
+                "/v1/enrichment/program_override",
+                json={"key": key, "values": {"value": value}},
+            )
+
+        entries = dashboard.post(
+            "/v1/enrichment/program_override/history", json={"key": key}
+        ).json()["entries"]
+
+        assert [(e["values"]["value"], e["is_live"]) for e in entries] == [
+            ("first", False),
+            ("second", True),
+        ]
+
+    def test_a_write_is_committed(self, dashboard: TestClient) -> None:
+        """`get_db` commits nothing — read paths must not — so a write route
+        that forgot would return 200 and change nothing, which is the worst
+        possible combination."""
+        key = {"crm_program_id": 93, "field": "trainer_name"}
+        dashboard.put(
+            "/v1/enrichment/program_override", json={"key": key, "values": {"value": "kept"}}
+        )
+
+        live_rows = body(dashboard, "/v1/enrichment/program_override")["entries"]
+        assert [e["values"]["value"] for e in live_rows] == ["kept"]
+
+    def test_retiring_leaves_the_history(self, dashboard: TestClient) -> None:
+        key = {"crm_program_id": 93, "field": "trainer_name"}
+        dashboard.put(
+            "/v1/enrichment/program_override", json={"key": key, "values": {"value": "gone"}}
+        )
+        dashboard.post(
+            "/v1/enrichment/program_override/retire",
+            json={"key": key, "note": "the CRM fixed it"},
+        )
+
+        assert body(dashboard, "/v1/enrichment/program_override")["entries"] == []
+        past = dashboard.post("/v1/enrichment/program_override/history", json={"key": key}).json()[
+            "entries"
+        ]
+        assert len(past) == 1
+        assert "the CRM fixed it" in past[0]["note"]
+
+    def test_a_partial_write_is_refused(self, dashboard: TestClient) -> None:
+        response = dashboard.put(
+            "/v1/enrichment/survey_question",
+            json={
+                "key": {"crm_survey_id": 2, "crm_question_id": 3},
+                "values": {"scale_max": 7},
+            },
+        )
+
+        assert response.status_code == 422
+
+    def test_it_requires_a_session(self, client: TestClient) -> None:
+        assert client.get("/v1/enrichment/program_override").status_code == 401

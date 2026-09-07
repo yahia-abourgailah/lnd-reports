@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from lnd.api.v1 import freshness, health, kpis, raw
+from lnd.api.v1 import drill, enrichment, freshness, health, kpis, raw
 from lnd.auth.router import router as auth_router
 
 router = APIRouter(prefix="/v1")
@@ -10,6 +10,8 @@ router.include_router(health.router)
 router.include_router(auth_router)
 router.include_router(freshness.router)
 router.include_router(kpis.router)
+router.include_router(drill.router)
+router.include_router(enrichment.router)
 router.include_router(raw.router)
 
 __all__ = ["router"]
