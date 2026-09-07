@@ -58,3 +58,111 @@ export const getAuthStatus = () => api<AuthStatus>('/auth/status')
 export const getMe = () => api<Me>('/auth/me')
 export const getHealth = () => api<Health>('/health')
 export const logout = () => api<{ status: string }>('/auth/logout', { method: 'POST' })
+
+// ---------------------------------------------------------------- the dashboard
+
+/** One figure, with everything needed to read it honestly.
+ *
+ * `formatted` comes from the server rather than being rendered here. NPS is an
+ * index and shows a sign, percentages show one decimal, hours show a thousands
+ * separator — and the export, the API and this screen must agree on all of it.
+ * A second formatter in TypeScript is a second definition of what the number
+ * looks like, which is how a dashboard and a PDF come to disagree.
+ */
+export interface Metric {
+  key: string
+  title: string
+  definition: string
+  population: string
+  excludes: string[]
+  provenance: 'unchanged' | 'restated' | 'renamed' | 'corrected' | 'new'
+  note: string | null
+  unit: 'count' | 'hours' | 'percent' | 'nps' | 'months'
+  value: string | null
+  formatted: string
+  numerator: string | null
+  denominator: string | null
+  sample_size: number
+  is_estimated: boolean
+}
+
+export interface EntityFreshness {
+  source: string
+  entity: string
+  status: 'ok' | 'stale' | 'never_synced'
+  last_success_at: string | null
+  lag_seconds: number | null
+  in_flight: boolean
+}
+
+export interface SourceFreshness {
+  source: string
+  status: 'ok' | 'stale' | 'never_synced'
+  lag_seconds: number | null
+  entities: EntityFreshness[]
+}
+
+/** Note there is no platform-level `lag_seconds`. The lag is per source and
+ *  per entity, because "how far behind is the platform" has no single answer
+ *  when one source is current and another has never run — which is exactly the
+ *  state today. The badge derives the worst one rather than inventing a field.
+ */
+export interface Freshness {
+  status: 'ok' | 'stale' | 'never_synced'
+  generated_at: string
+  stale_after_seconds: number
+  sources: SourceFreshness[]
+}
+
+interface Envelope {
+  freshness: Freshness
+  filters_applied: string
+  dimensions_filtered: string[]
+  excluded_count: number
+  cached: boolean
+}
+
+export interface KpisResponse extends Envelope {
+  metrics: Metric[]
+}
+
+export interface Slice {
+  key: string
+  label: string
+  metric: Metric
+}
+
+export interface BreakdownResponse extends Envelope {
+  metric_key: string
+  dimension: string
+  overall: Metric
+  slices: Slice[]
+  omitted: number
+}
+
+export interface TrendResponse extends Envelope {
+  metric_key: string
+  overall: Metric
+  points: Slice[]
+}
+
+export interface DimensionValue {
+  value: string
+  label: string
+  count: number
+}
+
+export interface DimensionOptions {
+  dimension: string
+  label: string
+  counts: string
+  values: DimensionValue[]
+}
+
+export const getKpis = (query: string) => api<KpisResponse>(`/kpis${query}`)
+export const getDimensions = () =>
+  api<{ dimensions: DimensionOptions[] }>('/kpis/dimensions')
+export const getBreakdown = (key: string, by: string, query: string) =>
+  api<BreakdownResponse>(`/kpis/${key}/breakdown${query ? `${query}&` : '?'}by=${by}`)
+export const getTrend = (key: string, query: string) =>
+  api<TrendResponse>(`/kpis/${key}/trend${query}`)
