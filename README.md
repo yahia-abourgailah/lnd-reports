@@ -22,18 +22,39 @@ make init     # writes .env from the template, with a generated SESSION_SECRET
 make up       # builds, starts all seven services, applies migrations
 ```
 
-→ <http://localhost:8080>
+→ <http://localhost:8080> — the dashboard, with the corrected numbers.
 
 `AUTH_DEV_BYPASS=true` is set in the template, so you can sign in before the
-Microsoft Entra app registration exists (Q-14). It is refused at startup in any
-environment other than `dev` — the process will not boot.
+Microsoft Entra app registration exists. It is refused at startup in any
+environment other than `dev` — the process will not boot, which is the point:
+authentication quietly disabled would be worse than a service that will not
+start.
 
 ```bash
 make logs S=api      # tail one service
 make check           # everything CI runs on the API
+make web-check       # typecheck and build the front end
 make psql            # a shell on the database
 make down            # stop;  make nuke  also drops the volumes
 ```
+
+### What updates when
+
+Data moves on a thirty-minute cycle, in two steps five minutes apart:
+
+```
+:00 and :30   sync       fetch from the CRM into raw
+:05 and :35   transform  rebuild core from raw, then clear the cache
+02:15         reconcile  a full pass — only this may conclude a record was deleted
+```
+
+A change made in the CRM at 10:07 reaches the dashboard around 10:35. The
+transform is a separate job from the sync on purpose: it reads only `raw`, so it
+still runs and still produces a correct `core` on a morning when the CRM is down
+and no sync succeeded at all.
+
+Nothing is precomputed. A filter nobody has used before is computed on request —
+cold about 240ms, warm about 56ms.
 
 ### No `make`?
 
@@ -79,16 +100,24 @@ api/
     db.py               SQLAlchemy 2.0 engine; the four schema names
     middleware.py       request id, access log, security headers
     auth/               OIDC + PKCE, signed session cookie
-    api/v1/             /v1/health, /v1/auth/*
+    api/v1/             health, auth, freshness, raw, kpis, drill, enrichment
     models/             SQLAlchemy tables; the shared Source and Entity enums
     sources/crm/        HTTP client and typed models for the two CRM endpoints
     ingest/             payload hashing and the append-only landing of raw
     sync/               the runner, watermarks, retry, breaker, presence
+    transform/          raw → core: conform, identity, invariant, exceptions
+    metrics/            the 21 KPIs, their populations, breakdowns, drill-through
+    enrichment/         the app overlay — supersede, never update
+    reference/          frozen dataset, golden values, reconciliation statement
     alerts/             freshness and reconcile rules, with renotify suppression
     worker/             Celery app and the beat schedule
-  alembic/versions/     0001 schemas → 0006 source_presence
+  tests/reference/      dataset.json.gz, golden.json — the CI gate reads these
+  alembic/versions/     0001 schemas → 0010 dashboard indexes
 
-web/                    React 18 + TS + Vite + TanStack Query
+web/src/
+  filters.ts            the global filter state, held in the URL
+  components/           KPI cards, filter bar, freshness badge, drill drawer,
+                        record grid, sparklines, enrichment screen
 
 .github/workflows/ci.yml
 ```
@@ -156,6 +185,73 @@ and Keycloak are configuration, not code.
 
 ---
 
+## The metric layer
+
+Twenty-one KPIs, each defined in exactly one place. The API, the exports and the
+golden-value suite all read the same declaration, so there is no second
+definition available to disagree with the first.
+
+```
+/v1/kpis                       every metric the filters allow
+/v1/kpis/{key}/breakdown?by=   one metric sliced by a dimension
+/v1/kpis/{key}/trend           month by month
+/v1/kpis/dimensions            what the filter bar may offer
+/v1/drill/{key}                the rows behind a number
+/v1/enrichment/{kind}          the decisions layered over the CRM
+```
+
+Every response carries **freshness**, the **filters applied**, and how many rows
+were **excluded** or merely **flagged** — two different things that share the
+data-quality queue and must never be reported as one.
+
+**Every metric declares its population, and no filter is ever inherited.** A
+metric asked to honour a dimension it does not define raises rather than
+returning the unfiltered number. That, not the ratio type, is what prevents
+P-03: the published NPS was not wrong because a ratio was averaged, it was wrong
+because it ran over a silently filtered 55 of 77 responses.
+
+Breakdowns re-run the metric under narrower filters rather than grouping inside
+it. Slower, and correct by construction — the parts sum to the whole, and that
+is a test.
+
+### Figures that moved
+
+Like for like, over the period the workbook actually covers — February to August
+2026, which is 50 of the 123 sessions the CRM holds:
+
+| | Workbook | Platform | Responses |
+|---|---|---|---|
+| Total Programs | 24 | **27** | 27 |
+| Participation Rate | 60.4% | **9.3%** | 1,455 |
+| NPS | 92.7% | **+83.1** | 118 |
+| Logistics Effectiveness | 96.4% | **91.5%** | 118 |
+
+**The window matters as much as the definition.** Over everything the CRM holds
+the same metrics read 55 programmes, 13.8% and +88.2 — larger for reasons that
+have nothing to do with correctness, because the workbook never covered July
+2025 to January 2026 or September 2026. Put that column beside the workbook's
+and it invites the reading that the platform discovered enormous amounts of
+extra training. It did not; it can simply see more.
+
+Participation was wrong twice over: divided by a hardcoded 192 (P-01), then by
+one company's headcount while attendance spanned five (P-13). NPS changed units
+as well as value — the workbook's figure was a percentage, and NPS is an index
+from −100 to +100. The two are not comparable and must not be shown as if they
+were.
+
+`docs/reconciliation.md` is generated from the registry, carries both windows,
+and walks every difference with the reason for it.
+
+### The gate
+
+`tests/reference/` holds an anonymised frozen dataset and the expected value of
+every figure at every grain. CI runs it as its own named step, so **a change
+that moves a published number fails the build** — and the failure names the
+metric, the old value and the new one. When a figure legitimately moves, the
+golden value is edited in the same commit as the code that moved it.
+
+---
+
 ## Health
 
 ```
@@ -193,3 +289,26 @@ a component library · GraphQL.
 
 The largest projected table is 15,000 rows. One PostgreSQL instance carries this
 for a decade; complexity here buys nothing and costs maintenance forever (R-08).
+
+No charting library either — the sparklines are a path and an area fill, and the
+record grid virtualises with a scroll offset and a slice. Both are less code to
+read than the dependency they would replace.
+
+---
+
+## Where it stands
+
+Weeks 1–6 are built and verified against the live CRM. What remains before an
+L&D specialist can use this unaided:
+
+- **The Microsoft Entra app registration.** Three blank settings, and the API
+  refuses to start outside dev without them. Nothing else blocks staging.
+- **The L&D walkthrough.** Every figure computes and every difference has a
+  written reason; nobody outside the team has seen 9.3% yet, and the plan is
+  explicit that it should not arrive alongside a dashboard.
+- **Two answers from the CRM team.** A trainer `employee_code`, so 16 spellings
+  stop needing an alias table; and `sector` still arrives with a trailing space
+  on 948 of 1,060 rows in the programs payload, though `get_users` is now clean.
+- **One from L&D.** History starts 2025-07-29, not September 2025 as the plan
+  records — 68 of 123 sessions predate the documented start. Real deliveries, or
+  data loaded during the CRM's own build?
