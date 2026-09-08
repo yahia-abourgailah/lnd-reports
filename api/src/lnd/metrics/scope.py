@@ -28,7 +28,7 @@ from typing import Any
 from sqlalchemy import ColumnElement, Select, func, or_, select
 from sqlalchemy.orm import Session
 
-from lnd.metrics.filters import MetricFilters
+from lnd.metrics.filters import Dimension, MetricFilters
 from lnd.models.core import (
     DimEmployee,
     DimProgram,
@@ -215,6 +215,31 @@ def enrollable_employees(filters: MetricFilters) -> Select[Any]:
     return statement.where(*_employee_predicates(filters))
 
 
+def untrained_employees(filters: MetricFilters) -> Select[Any]:
+    """The Coverage Gap, as rows: enrollable people with no attendance in scope.
+
+    One expression, called by both the metric that counts these people and the
+    view that lists them. Two would be two definitions of "untrained", and the
+    symptom of their drifting apart is a list whose length is not the number
+    printed above it — visible to a reader, and unfalsifiable by them.
+
+    The asymmetry is the same one Participation Rate declares: eligibility is
+    as of the period end, attendance is within the period. Narrowing
+    eligibility by the same dates would leave only people who attended, and the
+    gap would be empty by construction.
+    """
+    eligible = enrollable_employees(filters.without(Dimension.PERIOD)).subquery()
+    attended = attendances(filters).subquery()
+    return (
+        select(DimEmployee)
+        .where(
+            DimEmployee.employee_key.in_(select(eligible.c.employee_key)),
+            DimEmployee.employee_key.not_in(select(attended.c.employee_key)),
+        )
+        .order_by(DimEmployee.full_name)
+    )
+
+
 def count_of(session: Session, statement: Select[Any]) -> int:
     """How many rows the statement selects.
 
@@ -234,4 +259,5 @@ __all__ = [
     "evaluations",
     "programs",
     "sessions",
+    "untrained_employees",
 ]

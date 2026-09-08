@@ -307,3 +307,17 @@ def core_db(db_engine: Engine) -> Iterator[Session]:
         session.close()
         transaction.rollback()
         connection.close()
+
+
+@pytest.fixture
+def loaded(core_db: Session) -> Session:
+    """One programme transformed, with the question map seeded and one leaver.
+
+    Shared rather than defined beside the metric tests, because the week-7
+    views are checked against the same numbers. Two datasets would let a
+    scorecard test pass against a shape the metric tests never see — and the
+    whole claim those views make is that they show the same figures.
+    """
+    from tests.fixtures import metrics_dataset
+
+    return metrics_dataset.build(core_db)

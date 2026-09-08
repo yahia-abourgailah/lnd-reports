@@ -606,3 +606,155 @@ button.kpi-value:disabled { color: var(--ink-3); font-weight: 400; cursor: defau
   .enrich-row { grid-template-columns: 1fr; }
   .drawer { width: 100vw; }
 }
+
+/* ------------------------------------------ week 7: scorecards, coverage, funnel */
+
+/* One table shape for every list on these screens. The record grid stays where
+   it is — it is virtualised for thousands of rows, and 55 programmes do not
+   need windowing to be readable. */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule-soft);
+  vertical-align: top;
+}
+.table th {
+  font: 550 11.5px/1.4 var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  background: var(--surface-2);
+}
+.table tr:last-child td { border-bottom: 0; }
+.table a { color: var(--accent); text-decoration: none; }
+.table a:hover { text-decoration: underline; }
+
+.card-head { margin: 4px 0 18px; }
+.card-head h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.02em; }
+.card-head p { margin: 0 0 4px; font-size: 13.5px; }
+
+/* A compact KPI card: no chart, and the sample still shown. */
+.figures-caption { margin: 26px 0 10px; max-width: 76ch; }
+.figure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+.figure {
+  position: relative;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.figure-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.figure-head h4 { margin: 0; font-size: 12.5px; font-weight: 550; color: var(--ink-2); }
+.figure-value {
+  margin: 6px 0 2px;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.figure-sample { margin: 0; font: 400 11.5px/1.4 var(--mono); color: var(--ink-3); }
+.figure-empty .figure-value { color: var(--ink-3); }
+.figure:has(.kpi-tip) { z-index: 11; }
+
+/* ------------------------------------------------------------------ coverage */
+.segmented { display: inline-flex; gap: 2px; margin-top: 10px; }
+.segmented button {
+  font: inherit; font-size: 13px;
+  padding: 5px 12px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.segmented button:first-child { border-radius: 6px 0 0 6px; }
+.segmented button:last-child { border-radius: 0 6px 6px 0; }
+.segmented .segmented-on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+.search {
+  display: block; margin-top: 10px;
+  width: min(340px, 100%);
+  font: inherit; font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule); border-radius: 6px;
+  background: var(--surface); color: var(--ink);
+}
+
+.bars { list-style: none; margin: 0; padding: 0; }
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 1fr 64px;
+  grid-template-areas: 'label track value' '. note note';
+  align-items: center;
+  gap: 4px 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.bar-label {
+  grid-area: label;
+  font-size: 13px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bar-track {
+  grid-area: track;
+  height: 9px; border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+/* A common scale across slices: the point of this screen is that one company
+   is ten times another, and a bar normalised per row would hide exactly that. */
+.bar-fill { display: block; height: 100%; background: var(--accent); }
+.bar-value { grid-area: value; text-align: right; font: 550 13px/1 var(--mono); }
+.bar-note { grid-area: note; font: 400 11.5px/1.4 var(--mono); color: var(--ink-3); }
+
+/* -------------------------------------------------------------------- funnel */
+.funnel { list-style: none; margin: 18px 0 0; padding: 0; max-width: 720px; }
+.funnel-step { margin-bottom: 6px; }
+.funnel-bar {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  min-width: 180px;
+  padding: 14px 16px;
+  border: 0; border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.funnel-bar:hover { filter: brightness(0.97); }
+.funnel-label { font-size: 14px; font-weight: 550; }
+.funnel-count { font: 600 20px/1 var(--mono); letter-spacing: -0.01em; }
+.funnel-drop { margin: 6px 0 10px 16px; font-size: 13px; color: var(--ink-2); }
+.funnel-note { margin-top: 18px; max-width: 76ch; font-size: 13px; }
+
+/* ------------------------------------------------------------------ comments */
+.comments { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.comment {
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.comment-promoter { border-left-color: var(--ok); }
+.comment-passive { border-left-color: var(--warn); }
+.comment-detractor { border-left-color: var(--bad); }
+/* Whole, never clamped: these are the only explanation a quality score has. */
+.comment-text { margin: 0 0 6px; font-size: 14px; white-space: pre-wrap; }
+.comment-meta { margin: 0; font: 400 11.5px/1.4 var(--mono); color: var(--ink-3); }
+
+@media (max-width: 720px) {
+  .bar-row { grid-template-columns: 1fr 56px; grid-template-areas: 'label value' 'track track' 'note note'; }
+}

@@ -142,6 +142,64 @@ class MetricFilters:
             trainer_keys=self.trainer_keys if held(Dimension.TRAINER) else empty_ids,
         )
 
+    def narrowed_to(self, dimension: Dimension, value: str) -> MetricFilters:
+        """The same filters with one dimension pinned to one value.
+
+        The counterpart to `without`: a breakdown slice, a scorecard pinned to
+        one programme and a trend point are all this operation, and they were
+        three copies of it until the scorecards needed a fourth. One
+        implementation means a slice and a scorecard cannot disagree about what
+        "this programme" narrows.
+
+        Pinning replaces rather than intersects — a slice is one value, not the
+        one value the caller already asked for as well. `narrowed_within` is the
+        intersecting form, and the two are separate because confusing them is
+        how a scorecard comes to show a programme the filter bar excluded.
+        """
+        # The field name only. The value is built after the lookup, because
+        # programmes and trainers are keyed on integers and a table that built
+        # every candidate eagerly would parse "The Address Investments" as one.
+        names: dict[Dimension, str] = {
+            Dimension.SECTOR: "sectors",
+            Dimension.DEPARTMENT: "departments",
+            Dimension.COMPANY: "companies",
+            Dimension.JOB_LEVEL: "job_levels",
+            Dimension.PROGRAM_TYPE: "program_types",
+            Dimension.PROGRAM_TARGET: "program_targets",
+            Dimension.PROGRAM: "program_ids",
+            Dimension.TRAINER: "trainer_keys",
+        }
+        if dimension not in names:
+            raise UnsupportedFilter(f"{dimension} cannot be pinned to a single value")
+        name = names[dimension]
+        pinned: frozenset[str] | frozenset[int] = (
+            frozenset({int(value)})
+            if dimension in (Dimension.PROGRAM, Dimension.TRAINER)
+            else frozenset({value})
+        )
+        return MetricFilters(**{**vars(self), name: pinned})
+
+    def narrowed_within(self, dimension: Dimension, values: frozenset[int]) -> MetricFilters:
+        """Pin a dimension to a set, intersected with whatever was already asked.
+
+        A trainer scorecard asks its evaluation-grain figures for "the
+        programmes this trainer delivered". If the filter bar has already
+        narrowed to two programmes, the answer is the overlap and not the
+        trainer's whole catalogue — otherwise a scorecard opened from a filtered
+        dashboard silently widens the scope the reader thinks they are in.
+
+        An empty overlap raises rather than returning an empty set, because an
+        empty set in this type means "not filtered". Silently, that turns "this
+        trainer delivered nothing in the filtered period" into the whole
+        platform's figures under the trainer's name.
+        """
+        name = "program_ids" if dimension is Dimension.PROGRAM else "trainer_keys"
+        existing: frozenset[int] = getattr(self, name)
+        pinned = values & existing if existing else values
+        if not pinned:
+            raise EmptyScope(f"no {dimension.value} remains once the current filters are applied")
+        return MetricFilters(**{**vars(self), name: pinned})
+
 
 class UnsupportedFilter(ValueError):
     """A metric was asked to honour a dimension it does not define.
@@ -149,4 +207,13 @@ class UnsupportedFilter(ValueError):
     Deliberately an error rather than a shrug. Ignoring the filter would answer
     the question that was not asked, with a number that looks like the one that
     was — which is the whole of P-03.
+    """
+
+
+class EmptyScope(ValueError):
+    """A narrowing left nothing in scope.
+
+    Distinct from a metric that computes to zero, and the distinction is the
+    same one `MetricValue.is_defined` makes: "this trainer delivered nothing in
+    February" is an answer, and it is not "no-show rate 0%".
     """

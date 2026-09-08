@@ -226,6 +226,17 @@ class DimTrainer(Base):
     #: the same way the alias matcher does.
     normalised_name: Mapped[str] = mapped_column(String(200), nullable=False)
 
+    #: Not a person. `L&D Team` is what a session names when nobody recorded who
+    #: delivered it, and it ranks sixth by sessions — above four named trainers.
+    #: Marked rather than hidden: its sessions are real and its hours are in
+    #: every total, so removing it would leave a figure that does not add up.
+    is_placeholder: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    #: An outside vendor rather than a colleague. Their NPS is a fact about a
+    #: supplier, which is a different question from how a facilitator did.
+    is_external: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+
     first_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
