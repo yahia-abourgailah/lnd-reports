@@ -6,10 +6,12 @@ from lnd.api.v1 import (
     coverage,
     drill,
     enrichment,
+    exports,
     freshness,
     funnel,
     health,
     kpis,
+    learners,
     raw,
     scorecards,
 )
@@ -24,6 +26,8 @@ router.include_router(drill.router)
 router.include_router(scorecards.router)
 router.include_router(coverage.router)
 router.include_router(funnel.router)
+router.include_router(learners.router)
+router.include_router(exports.router)
 router.include_router(enrichment.router)
 router.include_router(raw.router)
 

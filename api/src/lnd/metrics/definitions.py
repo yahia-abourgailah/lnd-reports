@@ -55,6 +55,17 @@ LEARNER_DIMENSIONS = frozenset(
 #: the shape of P-13 and would read as a plausible number.
 ATTENDANCE_DIMENSIONS = LEARNER_DIMENSIONS | {Dimension.TRAINER}
 
+#: Metrics a learner profile is built from: the ones whose grain records what a
+#: person did, and whose numerator and denominator both narrow to that person.
+#:
+#: Deliberately not Participation Rate, Coverage Gap or any programme-grain
+#: metric. One person's participation rate is 1/1, which is not a rate; a
+#: session is not attributable to one attendee, so "their Training Days" would
+#: silently mean the days somebody else also delivered to. Those metrics refuse
+#: the dimension, and a profile shows what it can honestly show.
+PROFILE_DIMENSIONS = LEARNER_DIMENSIONS | {Dimension.LEARNER}
+PROFILE_ATTENDANCE_DIMENSIONS = ATTENDANCE_DIMENSIONS | {Dimension.LEARNER}
+
 PROGRAM_DIMENSIONS = frozenset(
     {
         Dimension.PERIOD,
@@ -172,7 +183,7 @@ TOTAL_PARTICIPANTS = TotalParticipants(
         population=pop.ATTENDANCES,
         provenance=Provenance.UNCHANGED,
         unit=Unit.COUNT,
-        supports=ATTENDANCE_DIMENSIONS,
+        supports=PROFILE_ATTENDANCE_DIMENSIONS,
     )
 )
 
@@ -194,7 +205,7 @@ LEARNER_HOURS = LearnerHours(
         population=pop.ATTENDANCES,
         provenance=Provenance.UNCHANGED,
         unit=Unit.HOURS,
-        supports=ATTENDANCE_DIMENSIONS,
+        supports=PROFILE_ATTENDANCE_DIMENSIONS,
     )
 )
 
@@ -245,7 +256,7 @@ def _quality(
             population=pop.RATED_EVALUATIONS,
             provenance=provenance,
             unit=Unit.PERCENT,
-            supports=LEARNER_DIMENSIONS,
+            supports=PROFILE_DIMENSIONS,
             note=note,
         ),
         column=column,
@@ -340,7 +351,7 @@ NPS = NetPromoterScore(
         population=pop.RATED_EVALUATIONS,
         provenance=Provenance.CORRECTED,
         unit=Unit.NPS,
-        supports=LEARNER_DIMENSIONS,
+        supports=PROFILE_DIMENSIONS,
         note=(
             "Two changes. Scope: over every response rather than a filtered 55 of 77 "
             "(P-03). Unit: the workbook's 92.7% was a percentage; NPS is a -100..+100 "
@@ -627,7 +638,7 @@ NO_SHOW_RATE = NoShowRate(
         population=pop.ENROLLMENTS,
         provenance=Provenance.NEW,
         unit=Unit.PERCENT,
-        supports=LEARNER_DIMENSIONS,
+        supports=PROFILE_DIMENSIONS,
     )
 )
 
@@ -731,7 +742,7 @@ SURVEY_RESPONSE_RATE = SurveyResponseRate(
         population=pop.ATTENDANCES,
         provenance=Provenance.NEW,
         unit=Unit.PERCENT,
-        supports=LEARNER_DIMENSIONS,
+        supports=PROFILE_DIMENSIONS,
         note=(
             "Qualifies every quality score. A high score over a low response rate "
             "is a weaker claim."
@@ -825,7 +836,7 @@ MONTHS_SINCE_LAST_TRAINING = MonthsSinceLastTraining(
         population=pop.ATTENDANCES,
         provenance=Provenance.NEW,
         unit=Unit.MONTHS,
-        supports=LEARNER_DIMENSIONS,
+        supports=PROFILE_DIMENSIONS,
         note="Median, not mean — the tail is long and a mean would describe nobody.",
     )
 )

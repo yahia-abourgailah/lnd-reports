@@ -209,7 +209,23 @@ computation of them:
 /v1/coverage?by=                participation and the gap, sliced
 /v1/coverage/untrained          the people with no training, once a scope is set
 /v1/funnel · /{stage}           enrolled → attended → evaluated, and its rows
+/v1/learners/top                the ranking — names once the view is narrowed
+/v1/learners/{key} · /search    one person's record, and the way to find them
 ```
+
+And week 8 puts them in files:
+
+```
+/v1/exports/kpis.csv|.xlsx           every figure the filters allow
+/v1/exports/records/{key}.csv|.xlsx  the rows behind one figure
+/v1/exports/monthly.xlsx             the workbook's DASHBOARD layout, generated
+```
+
+Every export carries a stamp: when it was generated, what filters produced it,
+how fresh the data was, how many records were excluded, and the definition of
+each figure in it. A dashboard figure can be re-checked against the definition
+beside it; a spreadsheet quoted six months later cannot, unless the file says so
+itself.
 
 Every response carries **freshness**, the **filters applied**, and how many rows
 were **excluded** or merely **flagged** — two different things that share the

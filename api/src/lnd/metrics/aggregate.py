@@ -130,6 +130,17 @@ def breakdown(
         )
     if dimension is Dimension.PERIOD:
         raise UnsupportedFilter("period is a trend, not a breakdown — use /trend")
+    if dimension not in SLICE_SOURCES:
+        # A dimension a metric accepts as a *filter* is not automatically one it
+        # can be sliced by. Learner is the case in point: every metric on a
+        # profile honours it, and slicing by it would enumerate one bar per
+        # person — a ranked list of everybody, which is a decision about people
+        # rather than a chart, and which `/v1/learners/top` gates on purpose.
+        raise UnsupportedFilter(
+            f"{metric_key} cannot be broken down by {dimension.value}: it names an "
+            "individual rather than a group. A ranking of people is "
+            "/v1/learners/top, which is scoped."
+        )
 
     source, column = SLICE_SOURCES[dimension]
     values = (
