@@ -14,6 +14,7 @@ import { Link, useParams } from 'react-router-dom'
 import { getProgramScorecard, getPrograms } from '../api'
 import type { Filters } from '../filters'
 import { ExclusionBanner } from './ExclusionBanner'
+import { ExportMenu } from './ExportMenu'
 import { Figures } from './Figure'
 
 function hours(value: string | null): string {
@@ -90,6 +91,20 @@ export function ProgramScorecard({ filters }: { filters: Filters }) {
         <p className="scope-line">
           <Link to={`/programs${filters.query}`}>← all programmes</Link>
         </p>
+        {/* PDF only. A scorecard is a page somebody sends to a trainer or reads
+            in a review, not rows to sort — and the comments, which are the part
+            worth sending, do not belong in a spreadsheet cell. */}
+        <ExportMenu
+          query={filters.query}
+          filtersApplied={card.data.filters_applied_scorecard}
+          options={[
+            {
+              path: `programs/${programId}/scorecard`,
+              label: 'This scorecard, comments and all',
+              formats: ['pdf'],
+            },
+          ]}
+        />
       </div>
 
       <header className="card-head">

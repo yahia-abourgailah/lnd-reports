@@ -48,6 +48,8 @@ from sqlalchemy import (
     DateTime,
     Index,
     Integer,
+    LargeBinary,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -573,3 +575,106 @@ class DqException(Base):
 
     def __repr__(self) -> str:
         return f"<DqException {self.rule} {self.status} x{self.occurrences} {self.exception_key}>"
+
+
+# ---------------------------------------------------------------------------
+# Retention: the editions that were actually published
+# ---------------------------------------------------------------------------
+class ExportKind(StrEnum):
+    """Which published artefact an edition is.
+
+    Only the monthly report is here, in its two formats. Ad-hoc downloads — a
+    drill-through of named attendees, a filtered figures sheet — are
+    deliberately *not* retained: they are generated for one question by one
+    person, they carry names, and keeping every one of them would build a
+    second copy of the roster in a table nobody audits. What retention is for
+    is the artefact that was published: "the report we sent in June".
+    """
+
+    MONTHLY_XLSX = "monthly_xlsx"
+    MONTHLY_PDF = "monthly_pdf"
+
+
+class ExportTrigger(StrEnum):
+    """Whether a person asked for this edition or the schedule did."""
+
+    MANUAL = "manual"
+    SCHEDULED = "scheduled"
+
+
+class ExportEdition(Base):
+    """One generated report, kept as it was sent.
+
+    WHY THE BYTES ARE IN THE DATABASE
+
+    A monthly report is ~40 KB and there are twelve a year. Putting the file on
+    a volume would mean a second thing to back up, restore and rehearse, on a
+    different schedule from the one the data is already on — and the whole point
+    of an edition is that it survives to be produced in an argument months
+    later. `pg_dump` already takes it. At a megabyte a year the storage argument
+    for a volume never arrives.
+
+    WHY IT IS NOT REGENERATED ON DEMAND INSTEAD
+
+    Because it would not be the same file. A report regenerated in October over
+    August's window is the *current* answer for August, and enrichment,
+    corrections and late-arriving CRM rows all move it. That regenerated answer
+    is usually the better one — and it is not what was sent, which is what
+    somebody holding the mail in their hand is asking about. Both are worth
+    having; only one of them can be recovered after the fact.
+    """
+
+    __tablename__ = "export_edition"
+    __table_args__ = (
+        # The obvious listing: newest first, optionally within one kind.
+        Index("ix_export_edition_recent", "kind", "generated_at"),
+        # Finding a period's editions — "show me every June report" — which is
+        # both what the console lists and what the pruner groups on.
+        Index("ix_export_edition_period", "kind", "period_year", "period_month"),
+        {"schema": SCHEMA_OPS},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    kind: Mapped[ExportKind] = mapped_column(
+        _enum_column(ExportKind, "export_kind"), nullable=False
+    )
+    trigger: Mapped[ExportTrigger] = mapped_column(
+        _enum_column(ExportTrigger, "export_trigger"), nullable=False
+    )
+
+    #: The period the report covers, not when it was made. A June report
+    #: generated in October is still the June report, and this is the column
+    #: that says so.
+    period_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    period_month: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    #: The scope sentence, stored beside the file rather than only inside it.
+    #: A listing has to be able to say what an edition was computed over
+    #: without opening a 40 KB workbook to find out.
+    filters_applied: Mapped[str] = mapped_column(Text, nullable=False)
+
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    #: Null when the schedule produced it. The distinction matters: nobody is
+    #: accountable for a file the platform made on its own, and pretending a
+    #: service account is a person is how an audit trail stops meaning anything.
+    generated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: A digest of the figures the edition contains, never of its bytes.
+    #: Hashing the file would answer almost nothing — the generation timestamp
+    #: is written into every export, so two renderings of one unchanged month
+    #: differ. The question a reader has on seeing two August rows is whether
+    #: the numbers moved, and two editions with this digest equal mean they did
+    #: not, whatever format they are in.
+    figures_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+    def __repr__(self) -> str:
+        return (
+            f"<ExportEdition {self.kind} {self.period_year}-{self.period_month:02d} "
+            f"{self.byte_size}b>"
+        )

@@ -27,8 +27,11 @@ export interface ExportOption {
   /** Path under /v1/exports, without the extension — e.g. `kpis`. */
   path: string
   label: string
-  /** Only xlsx for the monthly report; both for everything else. */
-  formats?: ('csv' | 'xlsx')[]
+  /** Defaults to the two table formats. PDF is offered where a file is more
+   *  likely to be forwarded than opened — the figures pack, a scorecard, the
+   *  monthly report — and never for a record extract, which is rows somebody
+   *  wants to sort rather than read. */
+  formats?: ('csv' | 'xlsx' | 'pdf')[]
   /** Said out loud when a file covers something narrower than the view. */
   note?: string
 }

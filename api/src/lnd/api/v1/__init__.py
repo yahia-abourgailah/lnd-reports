@@ -14,6 +14,7 @@ from lnd.api.v1 import (
     learners,
     raw,
     scorecards,
+    views,
 )
 from lnd.auth.router import router as auth_router
 
@@ -29,6 +30,7 @@ router.include_router(funnel.router)
 router.include_router(learners.router)
 router.include_router(exports.router)
 router.include_router(enrichment.router)
+router.include_router(views.router)
 router.include_router(raw.router)
 
 __all__ = ["router"]

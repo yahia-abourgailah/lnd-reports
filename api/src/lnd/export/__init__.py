@@ -11,6 +11,6 @@ rule would leave the wrong number in the attachment rather than on the screen,
 where somebody might have caught it.
 """
 
-from lnd.export import monthly, provenance, tables, writers
+from lnd.export import monthly, pdf, provenance, retention, tables, writers
 
-__all__ = ["monthly", "provenance", "tables", "writers"]
+__all__ = ["monthly", "pdf", "provenance", "retention", "tables", "writers"]

@@ -24,6 +24,7 @@ import { Link, useParams } from 'react-router-dom'
 import { getTrainerScorecard, getTrainers } from '../api'
 import type { Filters } from '../filters'
 import { ExclusionBanner } from './ExclusionBanner'
+import { ExportMenu } from './ExportMenu'
 import { Figures } from './Figure'
 
 function Marks({ placeholder, external }: { placeholder: boolean; external: boolean }) {
@@ -114,6 +115,21 @@ export function TrainerScorecard({ filters }: { filters: Filters }) {
         <p className="scope-line">
           <Link to={`/trainers${filters.query}`}>← all trainers</Link>
         </p>
+        {/* The file carries the same caveat this screen does: quality figures
+            are over the programmes this trainer delivered, not attributed to
+            them. A scorecard that travels without it is the one that gets read
+            as a performance rating. */}
+        <ExportMenu
+          query={filters.query}
+          filtersApplied={card.data.filters_applied_scorecard}
+          options={[
+            {
+              path: `trainers/${trainerKey}/scorecard`,
+              label: 'This scorecard, caveat and all',
+              formats: ['pdf'],
+            },
+          ]}
+        />
       </div>
 
       <header className="card-head">

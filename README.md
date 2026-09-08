@@ -100,7 +100,11 @@ api/
     db.py               SQLAlchemy 2.0 engine; the four schema names
     middleware.py       request id, access log, security headers
     auth/               OIDC + PKCE, signed session cookie
-    api/v1/             health, auth, freshness, raw, kpis, drill, enrichment
+    api/v1/             health, auth, freshness, raw, kpis, drill, coverage,
+                        funnel, scorecards, learners, exports, enrichment, views
+    analysis/           coverage, funnel, scorecards, learners — no arithmetic
+                        of their own; every figure is the registry's
+    export/             CSV, XLSX, PDF and the monthly report; retained editions
     models/             SQLAlchemy tables; the shared Source and Entity enums
     sources/crm/        HTTP client and typed models for the two CRM endpoints
     ingest/             payload hashing and the append-only landing of raw
@@ -112,12 +116,13 @@ api/
     alerts/             freshness and reconcile rules, with renotify suppression
     worker/             Celery app and the beat schedule
   tests/reference/      dataset.json.gz, golden.json — the CI gate reads these
-  alembic/versions/     0001 schemas → 0010 dashboard indexes
+  alembic/versions/     0001 schemas → 0012 editions and saved views
 
 web/src/
   filters.ts            the global filter state, held in the URL
   components/           KPI cards, filter bar, freshness badge, drill drawer,
-                        record grid, sparklines, enrichment screen
+                        record grid, sparklines, coverage, funnel, scorecards,
+                        learners, export menu, saved views, reports, enrichment
 
 .github/workflows/ci.yml
 ```
@@ -323,9 +328,45 @@ read than the dependency they would replace.
 
 ---
 
+## What leaves the building
+
+Every export computes through the metric registry — never a second
+implementation — and every file states its own scope before its numbers.
+
+| Format | Where | What it carries |
+|--------|-------|-----------------|
+| CSV / XLSX | any view | the figures or the rows behind one, with the stamp |
+| PDF | figures, programme and trainer scorecards, monthly report | the same numbers laid out to be printed or forwarded |
+| Monthly XLSX | Overview | the workbook's own DASHBOARD layout, so recipients need no retraining |
+
+The stamp is the generation time, the filters applied, the freshness, the
+excluded and flagged counts, and the definition of every figure in the file. A
+figure quoted six months later has no badge and no tooltip; the definition has
+to be in the file or it is not enforceable.
+
+**Editions.** Generating the monthly report keeps a copy of what was returned
+(`/reports`). Regenerating August in October gives the *current* answer for
+August — enrichment decisions, corrections and late CRM rows all move it — which
+is usually the better number and is never the file that was sent. Only the
+monthly report is retained: ad-hoc downloads are one person's question and carry
+names. A regeneration whose figures are unchanged is not stored, and the digest
+shown is of the figures rather than the bytes, because every export writes its
+own generation time into itself.
+
+**Saved views.** A named filter set, stored as the path and query string,
+because the URL is already the filter state. Restoring one is navigation, so
+there is no second representation to drift. Shared with everyone; renamed and
+deleted by whoever saved it.
+
+**PDF rendering** is fpdf2, not the WeasyPrint the plan named. WeasyPrint needs
+Pango and Cairo, which `python:3.12-slim` does not have — and a PDF writer that
+only runs in the container is one the test suite cannot assert. The fonts are
+vendored (`api/src/lnd/export/fonts/`) so a report renders identically in dev,
+in CI and in the image.
+
 ## Where it stands
 
-Weeks 1–6 are built and verified against the live CRM. What remains before an
+Weeks 1–8 are built and verified against the live CRM. What remains before an
 L&D specialist can use this unaided:
 
 - **The Microsoft Entra app registration.** Three blank settings, and the API
@@ -336,6 +377,9 @@ L&D specialist can use this unaided:
 - **Two answers from the CRM team.** A trainer `employee_code`, so 16 spellings
   stop needing an alias table; and `sector` still arrives with a trailing space
   on 948 of 1,060 rows in the programs payload, though `get_users` is now clean.
-- **One from L&D.** History starts 2025-07-29, not September 2025 as the plan
-  records — 68 of 123 sessions predate the documented start. Real deliveries, or
-  data loaded during the CRM's own build?
+- **Two from L&D.** History starts 2025-07-29, not September 2025 as the plan
+  records — 68 of 123 sessions predate the documented start: real deliveries, or
+  data loaded during the CRM's own build? And the **LinkedIn Learning export** —
+  its delivery mechanism and column set. Until it arrives, LinkedIn Hours,
+  Blended Learner Hours and Unique Reach report *no value* rather than zero:
+  there has been no measurement, which is not a measurement of none.

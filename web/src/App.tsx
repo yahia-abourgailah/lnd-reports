@@ -23,6 +23,7 @@ import { Kpis } from './components/Kpis'
 import { LearnerProfile } from './components/LearnerProfile'
 import { Learners } from './components/Learners'
 import { ProgramList, ProgramScorecard } from './components/Programs'
+import { Reports } from './components/Reports'
 import { TrainerList, TrainerScorecard } from './components/Trainers'
 import { useFilters } from './filters'
 
@@ -53,7 +54,11 @@ function Dashboard() {
   // the one that does not. A filter control that renders but changes nothing
   // is worse than no control: it invites somebody to narrow a screen and
   // conclude the data is missing.
-  const analytical = useLocation().pathname !== '/enrichment'
+  // The bar is absent from the two screens that read no figures. On
+  // `/reports` it would be worse than useless: a published edition covers the
+  // month it covered, and a filter bar above it would suggest otherwise.
+  const path = useLocation().pathname
+  const analytical = path !== '/enrichment' && path !== '/reports'
   const me = useQuery({ queryKey: ['me'], queryFn: getMe })
 
   // The badge reads the envelope of the request the page already made, rather
@@ -82,6 +87,7 @@ function Dashboard() {
             <NavLink to="/programs">Programmes</NavLink>
             <NavLink to="/trainers">Trainers</NavLink>
             <NavLink to="/learners">Learners</NavLink>
+            <NavLink to="/reports">Reports</NavLink>
             <NavLink to="/enrichment">Enrichment</NavLink>
           </nav>
 
@@ -114,6 +120,7 @@ function Dashboard() {
           <Route path="/trainers/:key" element={<TrainerScorecard filters={filters} />} />
           <Route path="/learners" element={<Learners filters={filters} />} />
           <Route path="/learners/:key" element={<LearnerProfile filters={filters} />} />
+          <Route path="/reports" element={<Reports />} />
           <Route path="/enrichment" element={<Enrichment />} />
           <Route
             path="*"

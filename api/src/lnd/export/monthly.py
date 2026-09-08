@@ -161,16 +161,34 @@ def _sample_note(values: dict[str, MetricValue]) -> str:
     )
 
 
-def _dashboard(sheet: Worksheet, session: Session, filters: MetricFilters) -> Stamp:
+#: The figures the monthly report carries, in the order it carries them. One
+#: list, read by the workbook, by the PDF and by the digest that decides whether
+#: a regeneration is worth keeping — so the three can never disagree about what
+#: "the monthly report" contains.
+REPORT_KEYS: tuple[str, ...] = tuple(
+    [placement.metric_key for placement in PLACEMENTS]
+    + ["participation_rate", "public_program_share"]
+)
+
+
+def headline(session: Session, filters: MetricFilters) -> dict[str, MetricValue]:
+    """Every figure on the report, keyed. Absent when the filters forbid it.
+
+    A metric that refuses the filters is left out rather than raised on: the
+    report is a fixed layout and one unanswerable figure must not cost the other
+    ten. The cell it would have filled says so.
+    """
     computed: dict[str, MetricValue] = {}
-    for key in [p.metric_key for p in PLACEMENTS] + [
-        "participation_rate",
-        "public_program_share",
-    ]:
+    for key in REPORT_KEYS:
         try:
             computed[key] = registry.compute(key, session, filters)
         except UnsupportedFilter:
             continue
+    return computed
+
+
+def _dashboard(sheet: Worksheet, session: Session, filters: MetricFilters) -> Stamp:
+    computed = headline(session, filters)
 
     sheet["A1"] = "Learning and Development Dashboard"
     sheet["A1"].font = TITLE_FONT
@@ -257,6 +275,8 @@ def monthly_report(session: Session, filters: MetricFilters) -> bytes:
 __all__ = [
     "PARTICIPATION_COLUMN",
     "PLACEMENTS",
+    "REPORT_KEYS",
+    "headline",
     "month_window",
     "monthly_report",
     "previous_month",

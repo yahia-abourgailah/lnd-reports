@@ -11,7 +11,14 @@ from sqlalchemy.orm import Session
 
 from lnd import db as lnd_db
 from lnd.config import get_settings
-from lnd.models import AlertNotification, RawRecord, SourcePresence, SyncRun
+from lnd.models import (
+    AlertNotification,
+    ExportEdition,
+    RawRecord,
+    SavedView,
+    SourcePresence,
+    SyncRun,
+)
 
 # Captured at import, before the autouse fixture below replaces DATABASE_URL
 # with a deliberately unreachable one. Tests that need a real database read
@@ -169,7 +176,18 @@ def live_db(db_engine: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[None
     with lnd_db.session_scope() as session:
         marks = {
             model: session.scalar(select(func.coalesce(func.max(model.id), 0))) or 0
-            for model in (SyncRun, AlertNotification, RawRecord, SourcePresence)
+            # `ExportEdition` and `SavedView` are here for the same reason as
+            # the rest: a route that writes one commits it, so it outlives the
+            # test and would otherwise accumulate in whatever database the
+            # suite was pointed at — including somebody's dev stack.
+            for model in (
+                SyncRun,
+                AlertNotification,
+                RawRecord,
+                SourcePresence,
+                ExportEdition,
+                SavedView,
+            )
         }
         # Captured as plain dicts rather than ORM objects: these have to
         # survive the session that read them and be reinserted into another.

@@ -18,6 +18,7 @@ import { useState } from 'react'
 
 import { getDimensions } from '../api'
 import type { Filters } from '../filters'
+import { SavedViews } from './SavedViews'
 
 function DimensionMenu({
   label,
@@ -112,6 +113,11 @@ export function FilterBar({ filters }: { filters: Filters }) {
           Clear {filters.activeCount}
         </button>
       )}
+
+      {/* In the bar rather than the chrome: what a saved view stores is the
+          state these controls are in, and putting the name for it anywhere
+          else would separate the two. */}
+      <SavedViews filters={filters} />
     </div>
   )
 }

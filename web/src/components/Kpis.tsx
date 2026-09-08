@@ -72,12 +72,16 @@ export function Kpis({ filters }: { filters: Filters }) {
           query={filters.query}
           filtersApplied={filters_applied}
           options={[
-            { path: 'kpis', label: 'These figures, with definitions' },
+            {
+              path: 'kpis',
+              label: 'These figures, with definitions',
+              formats: ['csv', 'xlsx', 'pdf'],
+            },
             {
               path: 'monthly',
               label: 'Monthly report',
-              formats: ['xlsx'],
-              note: 'last complete month — ignores the filter bar',
+              formats: ['xlsx', 'pdf'],
+              note: 'last complete month — ignores the filter bar · kept as an edition',
             },
           ]}
         />

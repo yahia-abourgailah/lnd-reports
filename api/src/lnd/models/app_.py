@@ -43,6 +43,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -309,3 +310,70 @@ class IdentityMapping(Base, _Authored):
 
     def __repr__(self) -> str:
         return f"<IdentityMapping {self.source_odoo_id} -> {self.target_odoo_id}>"
+
+
+class SavedView(Base):
+    """A named filter set, so a question somebody asks monthly is one click.
+
+    THE ONE TABLE IN THIS SCHEMA THAT IS NOT SUPERSEDED
+
+    Everything else here is superseded rather than updated, because everything
+    else here changes a published figure and FR-C03 requires the prior value.
+    A saved view changes nobody's number: it is a bookmark. Keeping a history of
+    renames would be audit theatre — weight in the schema that no question ever
+    asks — and the mixin is deliberately not used. Deleting one deletes it.
+
+    WHAT IS STORED IS THE URL, NOT A COPY OF THE FILTERS
+
+    `path` and `query` are exactly what the address bar holds, because the
+    address bar is already this application's filter state (see `web/filters.ts`).
+    Restoring a view is navigation, not deserialisation, and there is no second
+    representation of a filter set to drift from the first.
+
+    The query is still parsed and validated before it is stored — a saved view
+    that holds a parameter the API refuses is a bookmark that 422s a month
+    later, in front of whoever saved it.
+
+    VISIBLE TO EVERYONE, EDITABLE BY THE AUTHOR
+
+    v1 has one permission set: everybody who can sign in is L&D. A view called
+    "the numbers we present to the board" is worth more shared than hidden, and
+    the author is shown on it. Renaming and deleting stay with whoever made it,
+    so a shared list cannot be quietly rearranged.
+    """
+
+    __tablename__ = "saved_view"
+    __table_args__ = (
+        # One name per author. Two views called "Q3" by the same person is a
+        # mistake at the moment of saving, not a thing to discover later.
+        UniqueConstraint("owner_email", "name", name="uq_saved_view_owner_name"),
+        Index("ix_saved_view_owner", "owner_email"),
+        {"schema": SCHEMA_APP},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+
+    #: Whoever saved it. Email for the same reason `_Authored` uses one: the
+    #: IdP asserts it and a human can be resolved from it.
+    owner_email: Mapped[str] = mapped_column(String(320), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+
+    #: The screen, as a client-side route: `/`, `/coverage`, `/funnel`.
+    path: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: The filters, as the query string the API and the URL both already speak.
+    #: Stored without its leading `?`; empty means the unfiltered view, which is
+    #: a legitimate thing to save on a screen that defaults to something else.
+    query: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    #: The scope in words, resolved once at save time from the parsed filters.
+    #: A list of saved views has to read as sentences, not as query strings.
+    describes: Mapped[str] = mapped_column(Text, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    def __repr__(self) -> str:
+        return f"<SavedView {self.owner_email}:{self.name} {self.path}?{self.query}>"
