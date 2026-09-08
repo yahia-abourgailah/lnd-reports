@@ -89,9 +89,14 @@ revision: ## New migration (make revision M="add fact_attendance")
 	@test -n "$(M)" || (echo 'usage: make revision M="message"'; exit 1)
 	docker compose $(DEV) run --rm --no-deps api alembic revision -m "$(M)"
 
+# DDL needs the owning role, not the application one: `lnd_app_rw` has no
+# CREATE on the database by design, so this target could never have worked
+# without the same override `migrate` uses.
 .PHONY: downgrade
 downgrade: ## Roll back one migration
-	docker compose $(DEV) run --rm --no-deps api alembic downgrade -1
+	docker compose $(DEV) run --rm --no-deps \
+	  -e DATABASE_URL="postgresql+psycopg://$$(grep -E '^POSTGRES_USER=' .env | cut -d= -f2):$$(grep -E '^POSTGRES_PASSWORD=' .env | cut -d= -f2)@db:5432/$$(grep -E '^POSTGRES_DB=' .env | cut -d= -f2)" \
+	  api alembic downgrade -1
 
 # ------------------------------------------------------------------ checks
 .PHONY: lint
