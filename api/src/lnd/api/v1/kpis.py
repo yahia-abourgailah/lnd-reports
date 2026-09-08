@@ -163,6 +163,11 @@ def _filters(
     program_type: Annotated[list[str], Repeated] = [],  # noqa: B006
     program_target: Annotated[list[str], Repeated] = [],  # noqa: B006
     trainer: Annotated[list[int], Repeated] = [],  # noqa: B006
+    # Accepted here, and deliberately not offered by the filter bar. A learner
+    # filter is how a profile page asks for one person's figures; as a global
+    # control it would turn every screen into a search for an individual, which
+    # is a different product from the one L&D asked for.
+    learner: Annotated[list[int], Repeated] = [],  # noqa: B006
 ) -> MetricFilters:
     return MetricFilters(
         date_from=date_from,
@@ -175,6 +180,7 @@ def _filters(
         program_types=frozenset(program_type),
         program_targets=frozenset(program_target),
         trainer_keys=frozenset(trainer),
+        employee_keys=frozenset(learner),
     )
 
 

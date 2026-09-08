@@ -23,6 +23,9 @@ dependencies = [
   "itsdangerous>=2.2,<3",
   "celery[redis]>=5.4,<6",
   "redis>=5.2,<7",
+  # Exports. openpyxl reproduces the workbook's DASHBOARD layout cell for cell,
+  # which is what lets recipients keep the sheet they already know.
+  "openpyxl>=3.1,<4",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +35,7 @@ dev = [
   "ruff>=0.8,<0.13",
   "mypy>=1.13,<2",
   "types-requests",
+  "types-openpyxl",
 ]
 
 [tool.setuptools.packages.find]

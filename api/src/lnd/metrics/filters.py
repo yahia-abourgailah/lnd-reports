@@ -33,6 +33,11 @@ class Dimension(StrEnum):
     PROGRAM_TYPE = "program_type"
     PROGRAM_TARGET = "program_target"
     TRAINER = "trainer"
+    #: One person. What a learner profile narrows by, and the only dimension
+    #: that identifies an individual rather than a group — so it is never
+    #: offered as a breakdown: slicing a metric "by learner" is a ranked list of
+    #: everybody, which is a decision about people rather than a chart.
+    LEARNER = "learner"
 
 
 @dataclass(frozen=True)
@@ -53,6 +58,9 @@ class MetricFilters:
     program_types: frozenset[str] = field(default_factory=frozenset)
     program_targets: frozenset[str] = field(default_factory=frozenset)
     trainer_keys: frozenset[int] = field(default_factory=frozenset)
+    #: `dim_employee.employee_key`, not `odoo_id`: the surrogate names one
+    #: version of one person, which is what every fact points at.
+    employee_keys: frozenset[int] = field(default_factory=frozenset)
 
     @property
     def dimensions_used(self) -> frozenset[Dimension]:
@@ -73,6 +81,7 @@ class MetricFilters:
             ("program_types", Dimension.PROGRAM_TYPE),
             ("program_targets", Dimension.PROGRAM_TARGET),
             ("trainer_keys", Dimension.TRAINER),
+            ("employee_keys", Dimension.LEARNER),
         ):
             if getattr(self, name):
                 used.add(dimension)
@@ -110,6 +119,11 @@ class MetricFilters:
             parts.append(f"{len(self.program_ids)} program(s)")
         if self.trainer_keys:
             parts.append(f"{len(self.trainer_keys)} trainer(s)")
+        if self.employee_keys:
+            # Counted, not named. This string is stamped on every export, and a
+            # person's name in an export footer is a different disclosure from
+            # the profile page somebody deliberately opened.
+            parts.append(f"{len(self.employee_keys)} learner(s)")
         return "; ".join(parts)
 
     def without(self, *dimensions: Dimension) -> MetricFilters:
@@ -140,6 +154,7 @@ class MetricFilters:
             program_types=self.program_types if held(Dimension.PROGRAM_TYPE) else empty,
             program_targets=self.program_targets if held(Dimension.PROGRAM_TARGET) else empty,
             trainer_keys=self.trainer_keys if held(Dimension.TRAINER) else empty_ids,
+            employee_keys=self.employee_keys if held(Dimension.LEARNER) else empty_ids,
         )
 
     def narrowed_to(self, dimension: Dimension, value: str) -> MetricFilters:
@@ -168,13 +183,14 @@ class MetricFilters:
             Dimension.PROGRAM_TARGET: "program_targets",
             Dimension.PROGRAM: "program_ids",
             Dimension.TRAINER: "trainer_keys",
+            Dimension.LEARNER: "employee_keys",
         }
         if dimension not in names:
             raise UnsupportedFilter(f"{dimension} cannot be pinned to a single value")
         name = names[dimension]
         pinned: frozenset[str] | frozenset[int] = (
             frozenset({int(value)})
-            if dimension in (Dimension.PROGRAM, Dimension.TRAINER)
+            if dimension in (Dimension.PROGRAM, Dimension.TRAINER, Dimension.LEARNER)
             else frozenset({value})
         )
         return MetricFilters(**{**vars(self), name: pinned})

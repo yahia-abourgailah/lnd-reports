@@ -13,6 +13,6 @@ metrics do not carry: a programme's sessions, a trainer's catalogue, the
 free-text comments, the names behind a gap.
 """
 
-from lnd.analysis import coverage, funnel, scorecards
+from lnd.analysis import coverage, funnel, learners, scorecards
 
-__all__ = ["coverage", "funnel", "scorecards"]
+__all__ = ["coverage", "funnel", "learners", "scorecards"]

@@ -13,6 +13,14 @@ identified is quarantined, not dropped — it stays queryable and stays out of
 every metric. Counting it would attribute somebody's attendance to nobody;
 dropping it would hide that anybody had.
 
+**A learner filter narrows the facts, never the roster.** `employee_keys` is
+applied to attendance, enrollment and evaluation — the three grains that record
+what a person did. It is deliberately absent from `enrollable_employees`: a
+participation rate for one person is 1/1 or 0/1, which is not a rate, and a
+metric that accepted the filter on one side only would be P-13 again at the
+grain of an individual. The metrics that count over a roster refuse the
+dimension instead.
+
 **Employee attributes come from the version current now.** Sector, department
 and job level are read from `is_current`, which is a decision rather than an
 oversight: "attendance by department" means today's departments, so a
@@ -82,6 +90,8 @@ def attendances(filters: MetricFilters) -> Select[Any]:
         FactAttendance.deleted_at_source.is_(None),
         FactAttendance.identity_status != IdentityStatus.UNRESOLVED,
     )
+    if filters.employee_keys:
+        statement = statement.where(FactAttendance.employee_key.in_(sorted(filters.employee_keys)))
     if filters.date_from is not None:
         statement = statement.where(FactAttendance.attended_date >= filters.date_from)
     if filters.date_to is not None:
@@ -106,6 +116,8 @@ def enrollments(filters: MetricFilters) -> Select[Any]:
         FactEnrollment.deleted_at_source.is_(None),
         FactEnrollment.identity_status != IdentityStatus.UNRESOLVED,
     )
+    if filters.employee_keys:
+        statement = statement.where(FactEnrollment.employee_key.in_(sorted(filters.employee_keys)))
     if filters.date_from is not None:
         statement = statement.where(FactEnrollment.enrolled_date >= filters.date_from)
     if filters.date_to is not None:
@@ -126,6 +138,8 @@ def evaluations(filters: MetricFilters) -> Select[Any]:
         FactEvaluation.deleted_at_source.is_(None),
         FactEvaluation.identity_status != IdentityStatus.UNRESOLVED,
     )
+    if filters.employee_keys:
+        statement = statement.where(FactEvaluation.employee_key.in_(sorted(filters.employee_keys)))
     if filters.date_from is not None:
         statement = statement.where(FactEvaluation.responded_date >= filters.date_from)
     if filters.date_to is not None:
