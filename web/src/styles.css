@@ -758,3 +758,131 @@ button.kpi-value:disabled { color: var(--ink-3); font-weight: 400; cursor: defau
 @media (max-width: 720px) {
   .bar-row { grid-template-columns: 1fr 56px; grid-template-areas: 'label value' 'track track' 'note note'; }
 }
+
+/* ---------------------------------------------------------------- week 8 */
+
+.view-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 20px; margin-bottom: 16px;
+}
+.view-head h1 { font-size: 22px; letter-spacing: -0.018em; margin: 0 0 2px; }
+.view-head p { margin: 0; font-size: 13.5px; }
+.crumb { margin: 0 0 12px; font-size: 13px; }
+.crumb a { color: var(--ink-3); text-decoration: none; }
+.crumb a:hover { color: var(--accent); }
+.section { font-size: 15px; font-weight: 650; margin: 30px 0 10px; }
+.small { font-size: 12.5px; }
+
+/* Somebody who trained and has since left. Stated rather than left as a
+   discrepancy between their profile and the coverage screen. */
+.left-roster {
+  margin: 8px 0 0; padding: 7px 11px;
+  background: var(--warn-soft); color: var(--warn);
+  border-radius: 6px; font-size: 12.5px; display: inline-block;
+}
+
+/* -------------------------------------------------------------- export */
+.export { position: relative; flex: none; }
+.export-button {
+  font: inherit; font-size: 13px; font-weight: 550;
+  padding: 7px 14px; border: 1px solid var(--rule); border-radius: 6px;
+  background: var(--surface); color: var(--ink-2); cursor: pointer;
+}
+.export-button:hover { border-color: var(--accent); color: var(--accent); }
+.export-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 40;
+  width: 330px; padding: 12px 14px;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 8px; box-shadow: var(--shadow);
+}
+.export-scope {
+  margin: 0 0 10px; padding-bottom: 9px;
+  border-bottom: 1px solid var(--rule-soft);
+  font: 400 12px/1.45 var(--mono); color: var(--ink-3);
+}
+.export-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; padding: 7px 0; font-size: 13px;
+}
+.export-label { color: var(--ink-2); }
+.export-note { display: block; font-size: 11.5px; color: var(--ink-3); }
+.export-formats { display: flex; gap: 8px; flex: none; }
+.export-formats a {
+  font: 600 11px/1 var(--mono); letter-spacing: 0.04em;
+  color: var(--accent); text-decoration: none;
+  padding: 4px 7px; border: 1px solid var(--rule); border-radius: 4px;
+}
+.export-formats a:hover { background: var(--accent-soft); border-color: var(--accent); }
+.export-stamp {
+  margin: 10px 0 0; padding-top: 9px;
+  border-top: 1px solid var(--rule-soft);
+  font-size: 11.5px; line-height: 1.45; color: var(--ink-3);
+}
+
+/* -------------------------------------------------------------- learners */
+/* The distribution, shown whether or not the names are. It carries no
+   individual judgement, which is exactly why it is not gated. */
+.spread { margin: 0 0 22px; }
+.spread figcaption { font-size: 13.5px; color: var(--ink-2); margin-bottom: 9px; }
+.spread-track {
+  position: relative; height: 8px; border-radius: 4px;
+  background: var(--surface-2); overflow: visible;
+}
+.spread-fill {
+  position: absolute; inset: 0; border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent-soft), var(--series));
+}
+.spread-tick {
+  position: absolute; top: -4px; width: 2px; height: 16px;
+  background: var(--ink); border-radius: 1px; transform: translateX(-1px);
+}
+.spread-scale {
+  display: flex; justify-content: space-between;
+  margin-top: 6px; font: 400 11.5px/1 var(--mono);
+  color: var(--ink-3); font-variant-numeric: tabular-nums;
+}
+.spread-median { color: var(--ink-2); }
+
+.learner-search { margin-bottom: 20px; max-width: 460px; }
+.learner-search input {
+  width: 100%; font: inherit; font-size: 14px;
+  padding: 8px 12px; border: 1px solid var(--rule); border-radius: 7px;
+  background: var(--surface); color: var(--ink);
+}
+.learner-results { list-style: none; margin: 8px 0 0; padding: 0; }
+.learner-results li {
+  display: flex; gap: 12px; align-items: baseline;
+  padding: 7px 10px; border-bottom: 1px solid var(--rule-soft); font-size: 13.5px;
+}
+.learner-results li:last-child { border-bottom: none; }
+.learner-results a { font-weight: 550; }
+.learner-results .muted { font-size: 12px; }
+
+/* The gate. Presented as a decision with a reason, not as an empty state —
+   a blank table would read as a bug or as nobody having trained. */
+.gate {
+  padding: 18px 20px; border: 1px dashed var(--rule);
+  border-radius: 9px; background: var(--surface);
+}
+.gate-title { margin: 0 0 6px; font-weight: 650; font-size: 14.5px; }
+.gate p { font-size: 13.5px; margin: 0 0 8px; max-width: 68ch; }
+.gate p:last-child { margin-bottom: 0; }
+
+table.ranked td:first-child { color: var(--ink-3); width: 3ch; }
+
+@media (max-width: 720px) {
+  .view-head { flex-direction: column; gap: 12px; }
+  .export-menu { right: auto; left: 0; width: min(330px, 88vw); }
+}
+
+/* Numeric table columns. `.num` was used in the week-8 views with no rule
+   behind it, so figures sat left-aligned under right-aligned headers — the
+   kind of thing that reads as sloppiness and makes a column of numbers slower
+   to scan than it should be. Tabular figures so digits line up down the
+   column, which is the whole reason a table beats a list here. */
+th.r, td.r { text-align: right; }
+td.num, .ranked td.num {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}

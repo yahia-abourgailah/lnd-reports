@@ -29,6 +29,7 @@ import { useState } from 'react'
 import { getCoverage, getUntrained } from '../api'
 import type { Filters } from '../filters'
 import { ExclusionBanner } from './ExclusionBanner'
+import { ExportMenu } from './ExportMenu'
 import { Figure } from './Figure'
 import { RecordGrid } from './RecordGrid'
 
@@ -67,6 +68,21 @@ export function Coverage({ filters }: { filters: Filters }) {
 
   return (
     <>
+      <div className="view-head">
+        <div>
+          <h1>Coverage</h1>
+          <p className="muted">Who has been reached, and who has not.</p>
+        </div>
+        <ExportMenu
+          query={filters.query}
+          filtersApplied={data.filters_applied}
+          options={[
+            { path: 'records/coverage_gap', label: 'The roster this is measured against' },
+            { path: 'kpis', label: 'Every figure, with definitions' },
+          ]}
+        />
+      </div>
+
       <ExclusionBanner excluded={data.excluded_count} flagged={data.flagged_count} />
 
       <div className="figure-grid">

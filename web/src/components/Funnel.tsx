@@ -23,6 +23,7 @@ import { useEffect, useState } from 'react'
 import { getFunnel, getFunnelStage } from '../api'
 import type { Filters } from '../filters'
 import { ExclusionBanner } from './ExclusionBanner'
+import { ExportMenu } from './ExportMenu'
 import { RecordGrid } from './RecordGrid'
 
 function StageDrawer({
@@ -104,7 +105,7 @@ export function Funnel({ filters }: { filters: Filters }) {
   if (funnel.isError) return <p className="warn">The funnel could not be computed.</p>
   if (!funnel.data) return null
 
-  const { steps, walk_ins, excluded_count, flagged_count } = funnel.data
+  const { steps, walk_ins, excluded_count, flagged_count, filters_applied } = funnel.data
   const widest = Math.max(...steps.map((step) => step.count), 1)
 
   return (
@@ -114,6 +115,14 @@ export function Funnel({ filters }: { filters: Filters }) {
           One person on one programme at every stage. Somebody at three sessions of one programme
           is one attendee, not three.
         </p>
+        <ExportMenu
+          query={filters.query}
+          filtersApplied={filters_applied}
+          options={[
+            { path: 'records/no_show_rate', label: 'Enrollments behind the first stage' },
+            { path: 'records/survey_response_rate', label: 'Attendance behind the second' },
+          ]}
+        />
       </div>
 
       <ExclusionBanner excluded={excluded_count} flagged={flagged_count} />

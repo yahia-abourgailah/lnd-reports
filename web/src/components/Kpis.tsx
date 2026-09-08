@@ -18,6 +18,7 @@ import { getKpis, type Metric } from '../api'
 import type { Filters } from '../filters'
 import { DrillDrawer } from './DrillDrawer'
 import { ExclusionBanner } from './ExclusionBanner'
+import { ExportMenu } from './ExportMenu'
 import { KpiCard } from './KpiCard'
 
 const GROUPS: { provenance: Metric['provenance'][]; title: string; note: string }[] = [
@@ -62,6 +63,24 @@ export function Kpis({ filters }: { filters: Filters }) {
             <span className="scope-filtered"> · filtered by {dimensions_filtered.join(', ')}</span>
           )}
         </p>
+        {/* The monthly report is offered here and nowhere else. It is the one
+            export that ignores the filter bar — it covers a calendar month by
+            definition — so it belongs beside the figures it summarises rather
+            than on a screen where somebody has just narrowed to one sector and
+            would reasonably expect the file to match. */}
+        <ExportMenu
+          query={filters.query}
+          filtersApplied={filters_applied}
+          options={[
+            { path: 'kpis', label: 'These figures, with definitions' },
+            {
+              path: 'monthly',
+              label: 'Monthly report',
+              formats: ['xlsx'],
+              note: 'last complete month — ignores the filter bar',
+            },
+          ]}
+        />
       </div>
 
       <ExclusionBanner excluded={excluded_count} flagged={flagged_count} />

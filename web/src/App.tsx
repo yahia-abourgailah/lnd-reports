@@ -20,6 +20,8 @@ import { FreshnessBadge } from './components/FreshnessBadge'
 import { Enrichment } from './components/Enrichment'
 import { Funnel } from './components/Funnel'
 import { Kpis } from './components/Kpis'
+import { LearnerProfile } from './components/LearnerProfile'
+import { Learners } from './components/Learners'
 import { ProgramList, ProgramScorecard } from './components/Programs'
 import { TrainerList, TrainerScorecard } from './components/Trainers'
 import { useFilters } from './filters'
@@ -79,6 +81,7 @@ function Dashboard() {
             <NavLink to="/funnel">Funnel</NavLink>
             <NavLink to="/programs">Programmes</NavLink>
             <NavLink to="/trainers">Trainers</NavLink>
+            <NavLink to="/learners">Learners</NavLink>
             <NavLink to="/enrichment">Enrichment</NavLink>
           </nav>
 
@@ -109,6 +112,8 @@ function Dashboard() {
           <Route path="/programs/:id" element={<ProgramScorecard filters={filters} />} />
           <Route path="/trainers" element={<TrainerList filters={filters} />} />
           <Route path="/trainers/:key" element={<TrainerScorecard filters={filters} />} />
+          <Route path="/learners" element={<Learners filters={filters} />} />
+          <Route path="/learners/:key" element={<LearnerProfile filters={filters} />} />
           <Route path="/enrichment" element={<Enrichment />} />
           <Route
             path="*"

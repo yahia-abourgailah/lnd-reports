@@ -373,3 +373,84 @@ export const retireOverlay = (kind: string, key: Record<string, unknown>, note: 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key, note }),
   })
+
+// ------------------------------------------------------------------- learners
+
+export interface TopLearnerRow {
+  rank: number
+  employee_key: number
+  employee_code: string | null
+  name: string
+  department: string | null
+  company: string | null
+  programs: number
+  sessions: number
+  hours: string
+}
+
+export interface TopLearnersResponse extends Envelope {
+  total_learners: number
+  /** True when the ranking is withheld because the view is not narrowed.
+   *  The counts and the spread are exact either way — see `gate_note`. */
+  gated: boolean
+  gate_note: string | null
+  rows: TopLearnerRow[]
+  hours_max: string | null
+  hours_median: string | null
+  hours_min: string | null
+  truncated: boolean
+}
+
+export interface LearnerProgram {
+  crm_program_id: number
+  title: string
+  sessions: number
+  hours: string
+  first_attended: string | null
+  last_attended: string | null
+}
+
+export interface LearnerProfileResponse extends Envelope {
+  employee_key: number
+  employee_code: string | null
+  name: string
+  department: string | null
+  company: string | null
+  sector: string | null
+  job_level: string | null
+  position: string | null
+  /** False for somebody who trained and has since left. They stay in the
+   *  dimension so their attendance still keys; they are not in any
+   *  denominator. Worth saying on the profile rather than leaving the reader
+   *  to wonder why they are absent from coverage. */
+  on_current_roster: boolean
+  figures: Metric[]
+  programs: LearnerProgram[]
+}
+
+export interface SearchResult {
+  employee_key: number
+  employee_code: string | null
+  name: string
+  department: string | null
+  company: string | null
+}
+
+export const getTopLearners = (query: string, limit = 25) =>
+  api<TopLearnersResponse>(`/learners/top${query ? `${query}&` : '?'}limit=${limit}`)
+
+export const getLearner = (key: number, query: string) =>
+  api<LearnerProfileResponse>(`/learners/${key}${query}`)
+
+export const searchLearners = (q: string) =>
+  api<{ query: string; results: SearchResult[] }>(`/learners/search?q=${encodeURIComponent(q)}`)
+
+// -------------------------------------------------------------------- exports
+
+/** Export URLs are plain links, not fetches.
+ *
+ * The browser downloads them directly, so the session cookie goes with the
+ * request and the file never passes through JavaScript. A fetch-then-blob
+ * would put a 1,450-row XLSX through memory to achieve the same thing, and
+ * would lose the filename the server already sets in Content-Disposition. */
+export const exportUrl = (path: string, query: string) => `${API_BASE}/exports/${path}${query}`
