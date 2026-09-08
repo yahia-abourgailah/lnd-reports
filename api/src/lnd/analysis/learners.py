@@ -31,15 +31,30 @@ sessions than Gehad and fewer programmes. So sessions and programmes are shown
 beside hours rather than hidden, because a reader who can see the three
 orderings disagree will not mistake one of them for the truth.
 
-THE NAMES ARE SCOPED
+THE NAMES WERE SCOPED, AND ARE NOT ANY MORE
 
-A ranked, named list of employees by training hours is a leaderboard. It reads
-as recognition in one meeting and as a performance record in another, and
-nobody on it chose to be ranked. So it follows the rule week 7 set for the
-zero-training list, which is the same question from the other end: the counts
-and the distribution are always available, and names appear once the view is
-narrowed to a department, sector, company or job level. One predicate, and
-reversible the moment L&D say it is a celebration they want published.
+This ranking was gated at first: names appeared only once the view was narrowed
+to a department, sector, company or job level, following the rule week 7 set for
+the zero-training list. That was a judgement made here rather than a decision
+L&D asked for, and the week-8 handover recorded it as provisional.
+
+It was the wrong call, and the requirement says so plainly — "provide a
+top-learners ranking by learning hours, derived automatically, replacing the
+hand-typed sheet". The sheet being replaced was a company-wide Top Learner that
+the workbook already published every cycle, everyone who can sign in is L&D, and
+a screen headed "Top learners" that shows no learners is not a careful version
+of the feature. It is the feature withheld.
+
+The caution is still true — a ranked list of colleagues by training hours reads
+as recognition in one meeting and as a record in another — so it is said on the
+screen instead of enforced by hiding rows. The three orderings are shown side by
+side for the same reason: sessions, programmes and hours disagree, and a reader
+who can see that will not mistake one of them for a verdict.
+
+The zero-training list on `/coverage` is still gated. It is not the same
+artefact: a named list of people who have had *nothing* is a document about
+individuals in a way a ranking of who attended most is not, and nobody has asked
+for that one to be opened.
 """
 
 from __future__ import annotations
@@ -51,7 +66,6 @@ from decimal import Decimal
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
-from lnd.analysis.coverage import GATING_DIMENSIONS
 from lnd.metrics import registry, scope
 from lnd.metrics.base import MetricValue
 from lnd.metrics.filters import Dimension, MetricFilters, UnsupportedFilter
@@ -104,17 +118,35 @@ class TopLearners:
     """The ranking, or the shape of it without the names."""
 
     total_learners: int
-    #: True when nothing narrows the view and the names are withheld.
-    gated: bool
     rows: tuple[LearnerRank, ...]
     #: Hours at the top, the median and the bottom of the ranked population.
-    #: Returned even when gated: the distribution is what a planning
-    #: conversation needs, and it names nobody.
+    #: Returned beside the ranking rather than derived from the rows shown: the
+    #: median of the visible fifty is not the median of the population, and a
+    #: reader would have no way to tell which one they were looking at.
     hours_max: Decimal | None
     hours_median: Decimal | None
     hours_min: Decimal | None
     truncated: bool
     filters_applied: str
+
+
+@dataclass(frozen=True)
+class LearnerMatch:
+    """One search hit.
+
+    Typed, and named the way `LearnerRank` names the same attributes, because
+    the two lists sit on one screen. This was a bare `dict` of column names
+    until 8 September: the query selected `full_name` and `department_name`,
+    the screen read `name` and `department`, and every match rendered as an
+    empty row. Nothing could catch it — an untyped dict at the boundary is a
+    contract neither mypy nor TypeScript can check.
+    """
+
+    employee_key: int
+    employee_code: str | None
+    name: str | None
+    department: str | None
+    company: str | None
 
 
 @dataclass(frozen=True)
@@ -176,20 +208,15 @@ def _ranked(filters: MetricFilters) -> Select[tuple[int, int, int, Decimal]]:
     )
 
 
-def is_gated(filters: MetricFilters) -> bool:
-    """True where nothing narrows the ranking to a scope somebody chose.
-
-    The same predicate the zero-training list uses, and for the symmetrical
-    reason: a company-wide ordering of everybody by hours is a document about
-    people, whichever end of it you read.
-    """
-    return not (filters.dimensions_used & set(GATING_DIMENSIONS))
-
-
 def top_learners(
     session: Session, filters: MetricFilters | None = None, *, limit: int = DEFAULT_LIMIT
 ) -> TopLearners:
-    """The ranking. Counts and distribution always; names once scoped."""
+    """The ranking, derived rather than typed (P-09, P-10).
+
+    The whole population is ranked and the first `limit` of it returned, so
+    narrowing the filters changes who is in the ranking rather than how much of
+    it is visible. `truncated` says when there is more below.
+    """
     applied = filters or MetricFilters()
     ranked = _ranked(applied).subquery()
 
@@ -206,20 +233,6 @@ def top_learners(
     hours_min = None if low is None else Decimal(str(low))
     hours_median = None if median is None else Decimal(str(median))
     described = applied.describe()
-
-    if is_gated(applied):
-        # The distribution without the ranking. Everything a planning
-        # conversation needs, and nobody's name.
-        return TopLearners(
-            total_learners=total,
-            gated=True,
-            rows=(),
-            hours_max=hours_max,
-            hours_median=hours_median,
-            hours_min=hours_min,
-            truncated=total > 0,
-            filters_applied=described,
-        )
 
     capped = max(1, min(limit, MAX_LIMIT))
     listed = session.execute(
@@ -261,7 +274,6 @@ def top_learners(
 
     return TopLearners(
         total_learners=total,
-        gated=False,
         rows=tuple(rows),
         hours_max=hours_max,
         hours_median=hours_median,
@@ -345,13 +357,17 @@ def profile(
     )
 
 
-def find(session: Session, query: str, limit: int = 20) -> list[dict[str, object]]:
+def find(session: Session, query: str, limit: int = 20) -> list[LearnerMatch]:
     """Look up a person by name or employee code.
 
-    The way into a profile that is not a ranking. Requires something to search
-    for — an empty query returns nothing rather than the first twenty people,
-    because "everybody, alphabetically" is the roster the gate exists to
-    withhold.
+    The way into one person without reading a ranking at all. Requires
+    something to search for: an empty query returns nothing rather than the
+    first twenty people, because "everybody, alphabetically" is a roster and
+    nobody asked for one.
+
+    Restricted to people with attendance, like the ranking — a search that
+    returned somebody who has never attended would lead to a profile with
+    nothing on it.
     """
     text = query.strip()
     if not text:
@@ -369,6 +385,7 @@ def find(session: Session, query: str, limit: int = 20) -> list[dict[str, object
             DimEmployee.employee_code,
             DimEmployee.full_name,
             DimEmployee.department_name,
+            DimEmployee.company_name,
         )
         .where(
             DimEmployee.is_current,
@@ -378,18 +395,27 @@ def find(session: Session, query: str, limit: int = 20) -> list[dict[str, object
         )
         .order_by(DimEmployee.full_name)
         .limit(limit)
-    ).mappings()
-    return [dict(row) for row in rows]
+    ).all()
+    return [
+        LearnerMatch(
+            employee_key=row.employee_key,
+            employee_code=row.employee_code,
+            name=row.full_name,
+            department=row.department_name,
+            company=row.company_name,
+        )
+        for row in rows
+    ]
 
 
 __all__ = [
     "AttendedProgram",
+    "LearnerMatch",
     "LearnerProfile",
     "LearnerRank",
     "TopLearners",
     "UnknownLearner",
     "find",
-    "is_gated",
     "profile",
     "top_learners",
 ]

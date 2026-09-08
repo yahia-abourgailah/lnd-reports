@@ -26,6 +26,9 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     throw new Error(`${init.method ?? 'GET'} ${path} failed: ${response.status}`)
   }
+  // A 204 carries no body, and `response.json()` on one throws. Deleting a
+  // saved view is the first route in this API that returns one.
+  if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }
 
@@ -296,6 +299,9 @@ export interface CoverageResponse extends Envelope {
 
 export interface UntrainedResponse extends Envelope {
   total: number
+  /** The zero-training list is still gated: a named list of people who have
+   *  had nothing is a document about individuals in a way the top-learners
+   *  ranking is not. The count is exact either way. */
   gated: boolean
   gate_note: string
   columns: string[]
@@ -390,10 +396,6 @@ export interface TopLearnerRow {
 
 export interface TopLearnersResponse extends Envelope {
   total_learners: number
-  /** True when the ranking is withheld because the view is not narrowed.
-   *  The counts and the spread are exact either way — see `gate_note`. */
-  gated: boolean
-  gate_note: string | null
   rows: TopLearnerRow[]
   hours_max: string | null
   hours_median: string | null
@@ -428,10 +430,14 @@ export interface LearnerProfileResponse extends Envelope {
   programs: LearnerProgram[]
 }
 
+/** One search hit. Named the way `TopLearnerRow` names the same attributes,
+ *  because the two lists sit on one screen — and because they once did not:
+ *  the API sent `full_name` and `department_name` to a component reading
+ *  `name` and `department`, so every match rendered as an empty row. */
 export interface SearchResult {
   employee_key: number
   employee_code: string | null
-  name: string
+  name: string | null
   department: string | null
   company: string | null
 }
@@ -454,3 +460,76 @@ export const searchLearners = (q: string) =>
  * would put a 1,450-row XLSX through memory to achieve the same thing, and
  * would lose the filename the server already sets in Content-Disposition. */
 export const exportUrl = (path: string, query: string) => `${API_BASE}/exports/${path}${query}`
+
+// ------------------------------------------------------------------ editions
+
+/** One monthly report as it was published.
+ *
+ * The listing never carries the file. `figures_sha256` digests the numbers the
+ * edition contains, never its bytes: every export writes its own generation
+ * time into itself, so two renderings of an unchanged month would never match
+ * byte for byte. Equal digests mean the figures did not move — across formats
+ * too, since the workbook and the PDF of one month share it. */
+export interface Edition {
+  id: number
+  kind: 'monthly_xlsx' | 'monthly_pdf'
+  trigger: 'manual' | 'scheduled'
+  /** `YYYY-MM`: the month covered, not the month generated. */
+  period: string
+  filename: string
+  content_type: string
+  filters_applied: string
+  generated_at: string
+  /** Null when the schedule made it. Not a service account standing in for a
+   *  person — the difference is the whole value of the column. */
+  generated_by: string | null
+  byte_size: number
+  figures_sha256: string
+}
+
+export interface EditionsResponse {
+  editions: Edition[]
+  total_editions: number
+  total_bytes: number
+  retained_per_period: number
+}
+
+export const getEditions = () => api<EditionsResponse>('/exports/editions')
+
+// --------------------------------------------------------------- saved views
+
+/** A named filter set. What is stored is the URL, because the URL is already
+ *  this application's filter state — see `filters.ts`. */
+export interface SavedView {
+  id: number
+  name: string
+  path: string
+  /** Without a leading `?`. Empty means the unfiltered view. */
+  query: string
+  /** The scope in words, resolved by the server when it was saved. */
+  describes: string
+  owner_email: string
+  /** Whether the signed-in user may rename or delete this one. */
+  mine: boolean
+  created_at: string
+  updated_at: string
+}
+
+export const getViews = () => api<{ views: SavedView[] }>('/views')
+
+export const saveView = (name: string, path: string, query: string) =>
+  api<SavedView>('/views', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, path, query }),
+  })
+
+export const renameView = (id: number, name: string) =>
+  api<SavedView>(`/views/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+
+export const deleteView = (id: number) =>
+  api<void>(`/views/${id}`, { method: 'DELETE' })

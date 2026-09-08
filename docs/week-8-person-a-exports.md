@@ -159,9 +159,16 @@ arrives, the golden file moves for the first time on purpose, and
 
 ## Open
 
-- **The gate on the ranking is provisional.** It follows week 7's precedent
-  rather than a decision L&D have made. The plan says "automatic ranking" and
-  does not say who sees it.
+- ~~**The gate on the ranking is provisional.**~~ **Removed, 8 September.** It
+  followed week 7's precedent rather than a decision L&D had made, and it
+  withheld the requirement itself: "provide a top-learners ranking by learning
+  hours, derived automatically, replacing the hand-typed sheet" — a sheet the
+  workbook published company-wide every cycle. A screen headed "Top learners"
+  showing no learners is the feature withheld, not a careful version of it. The
+  caution is now said on the screen instead of enforced by hiding rows. The
+  zero-training list on `/coverage` keeps its gate: a named list of people who
+  have had *nothing* is a different document from a ranking of who attended
+  most, and nobody has asked for that one to be opened.
 - **No front end.** These are Person A's queries and endpoints; the learner
   profile, the top-learners view and the export buttons are Person B's half of
   week 8.

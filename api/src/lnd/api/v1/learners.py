@@ -1,17 +1,27 @@
 """Learner profiles and the top-learners ranking.
 
-Three routes. `/v1/learners/top` returns the shape of the ranking always and
-the names only once the view is narrowed — the same rule `/v1/coverage/untrained`
-follows, for the same reason read from the other end. `/v1/learners/search`
+Three routes. `/v1/learners/top` returns the ranking — the whole population
+ordered, the first `limit` of it listed, and the distribution beside it so the
+visible fifty are not mistaken for the shape of the whole. `/v1/learners/search`
 is the way into a profile that is not a ranking, and it requires something to
 search for.
+
+The ranking used to withhold names unless the view was narrowed. That was a
+judgement made in week 8 rather than a decision L&D asked for, and it withheld
+the requirement itself — "a top-learners ranking by learning hours, derived
+automatically, replacing the hand-typed sheet", where the sheet being replaced
+was company-wide. See `lnd.analysis.learners` for what replaced it.
+
+`/v1/coverage/untrained` is still gated, and deliberately: a named list of
+people who have had no training at all is a different document from a ranking of
+who attended most.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -25,12 +35,6 @@ from lnd.db import get_db
 router = APIRouter(prefix="/learners", tags=["learners"])
 
 DbSession = Annotated[Session, Depends(get_db)]
-
-GATE_NOTE = (
-    "Names are shown once the view is narrowed to a department, sector, company or "
-    "job level. The counts and the spread of hours are exact either way — it is the "
-    "ranked list of individuals that is scoped, not the figures."
-)
 
 
 class RankOut(BaseModel):
@@ -50,8 +54,6 @@ class RankOut(BaseModel):
 
 class TopLearnersResponse(Envelope):
     total_learners: int
-    gated: bool
-    gate_note: str
     rows: list[RankOut]
     hours_max: Decimal | None
     hours_median: Decimal | None
@@ -86,9 +88,26 @@ class LearnerProfileResponse(Envelope):
     filters_applied_profile: str
 
 
+class MatchOut(BaseModel):
+    """One search hit, with the same field names `RankOut` uses.
+
+    A model rather than a bare dict. This route returned raw column names —
+    `full_name`, `department_name` — while the screen read `name` and
+    `department`, so every match rendered as an empty row and neither type
+    checker could see it. An untyped dict at an API boundary is a contract
+    nothing verifies.
+    """
+
+    employee_key: int
+    employee_code: str | None
+    name: str | None
+    department: str | None
+    company: str | None
+
+
 class SearchResponse(BaseModel):
     query: str
-    results: list[dict[str, Any]]
+    results: list[MatchOut]
 
 
 @router.get("/top", response_model=TopLearnersResponse)
@@ -106,8 +125,6 @@ def top_learners(
     result = service.top_learners(session, filters, limit=limit)
     return TopLearnersResponse(
         total_learners=result.total_learners,
-        gated=result.gated,
-        gate_note=GATE_NOTE,
         rows=[RankOut(**vars(row)) for row in result.rows],
         hours_max=result.hours_max,
         hours_median=result.hours_median,
@@ -124,7 +141,9 @@ def search(
     session: DbSession,
     q: Annotated[str, Query(description="a name or employee code")] = "",
 ) -> SearchResponse:
-    return SearchResponse(query=q, results=service.find(session, q))
+    return SearchResponse(
+        query=q, results=[MatchOut(**vars(match)) for match in service.find(session, q)]
+    )
 
 
 @router.get("/{employee_key}", response_model=LearnerProfileResponse)

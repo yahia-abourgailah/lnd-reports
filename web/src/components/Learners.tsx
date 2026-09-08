@@ -1,23 +1,30 @@
 /**
  * Top learners, and the search that reaches anybody else.
  *
- * THE RANKING IS SCOPED, THE NUMBERS ARE NOT
+ * THE RANKING WAS SCOPED, AND IS NOT ANY MORE
  *
- * A named league table of employees by training hours reads as recognition in
- * one meeting and as a performance record in another, and nobody on it asked to
- * be ranked. So the API withholds names until the view is narrowed to a
- * department, sector, company or job level — while the count and the spread
- * stay exact either way.
+ * This screen used to withhold the names unless the view was narrowed to a
+ * department, sector, company or job level. A screen headed "Top learners" that
+ * showed no learners is not a careful version of the feature, and the
+ * requirement it was hiding is explicit: a top-learners ranking, derived
+ * automatically, replacing the hand-typed sheet — a sheet the workbook already
+ * published company-wide every cycle.
  *
- * This screen shows that spread whether or not the names are available, because
- * "288 learners, from 19.5 to 60.5 hours, median 44.5" is the useful part of a
- * distribution and carries no individual judgement at all. The gate is a
- * decision about people rather than a technical limit, and the screen says so
- * rather than looking broken.
+ * The caution behind the gate is still true, so it is said rather than
+ * enforced: a named list ordered by training hours reads as recognition in one
+ * meeting and as a record in another. The line under the title says what the
+ * ranking is and is not, and the three measures sit side by side because they
+ * disagree — more sessions is not more programmes, and neither is more hours.
  *
- * Search is the way to one person without ranking anybody. Looking somebody up
- * because you are about to talk to them is a different act from reading down a
- * list of who is bottom.
+ * THE POPULATION LINE IS NOT THE VISIBLE ROWS
+ *
+ * "288 learners, from 1 to 60.5 hours, median 8" is computed over the whole
+ * ranked population, not the twenty-five on screen. A median of the visible
+ * rows would be a different statistic wearing the same label.
+ *
+ * Search is still the way to one person without reading a ranking at all.
+ * Looking somebody up because you are about to talk to them is a different act
+ * from reading down a list.
  */
 
 import { useQuery } from '@tanstack/react-query'
@@ -29,7 +36,7 @@ import type { Filters } from '../filters'
 import { ExclusionBanner } from './ExclusionBanner'
 import { ExportMenu } from './ExportMenu'
 
-function Spread({
+function Population({
   min,
   median,
   max,
@@ -44,27 +51,27 @@ function Spread({
   const low = Number(min)
   const mid = Number(median)
   const high = Number(max)
-  // Guard the degenerate case rather than dividing by it: one learner, or a
-  // filter where everybody has identical hours, would put the marker at NaN%.
-  const span = high - low || 1
-  const at = (v: number) => `${((v - low) / span) * 100}%`
 
+  // A sentence, not a bar. This was a gradient track with a tick on it, and the
+  // geometry kept saying things the numbers did not: the median label was
+  // pinned to the centre of the bar wherever the median actually was, and a
+  // single learner got a full-width gradient implying a spread of one point.
+  // Three numbers in a line carry everything the drawing did and cannot be
+  // misread by position.
   return (
-    <figure className="spread">
-      <figcaption>
-        <strong>{total.toLocaleString()}</strong> learner{total === 1 ? '' : 's'} with any
-        attendance, from {low} to {high} hours
-      </figcaption>
-      <div className="spread-track">
-        <span className="spread-fill" />
-        <span className="spread-tick" style={{ left: at(mid) }} title={`median ${mid} hours`} />
-      </div>
-      <div className="spread-scale">
-        <span>{low} h</span>
-        <span className="spread-median">median {mid} h</span>
-        <span>{high} h</span>
-      </div>
-    </figure>
+    <p className="population">
+      <strong>{total.toLocaleString()}</strong> learner{total === 1 ? '' : 's'} with any
+      attendance
+      {high === low ? (
+        <>
+          , {total === 1 ? 'on' : 'all on'} {low} hour{low === 1 ? '' : 's'}
+        </>
+      ) : (
+        <>
+          , from {low} to {high} hours · median {mid}
+        </>
+      )}
+    </p>
   )
 }
 
@@ -89,7 +96,11 @@ export function Learners({ filters }: { filters: Filters }) {
       <div className="view-head">
         <div>
           <h1>Top learners</h1>
-          <p className="muted">Ranked by learner hours — the sum of the sessions a person attended.</p>
+          <p className="muted">
+            Ranked by learner hours — the sum of the sessions a person attended. It says who
+            received the most training, not who performed best, and the three measures below
+            disagree: more sessions is not more programmes, and neither is more hours.
+          </p>
         </div>
         <ExportMenu
           query={filters.query}
@@ -102,7 +113,7 @@ export function Learners({ filters }: { filters: Filters }) {
 
       <ExclusionBanner excluded={data.excluded_count} flagged={data.flagged_count} />
 
-      <Spread
+      <Population
         min={data.hours_min}
         median={data.hours_median}
         max={data.hours_max}
@@ -136,15 +147,10 @@ export function Learners({ filters }: { filters: Filters }) {
         )}
       </div>
 
-      {data.gated ? (
-        <div className="gate">
-          <p className="gate-title">The ranking is not shown for the whole company</p>
-          <p>{data.gate_note}</p>
-          <p className="muted">
-            Narrow by department, sector, company or job level in the bar above — or search for
-            somebody by name. The figures above are exact either way.
-          </p>
-        </div>
+      {data.rows.length === 0 ? (
+        <p className="muted">
+          Nobody has attended anything in this scope, so there is nothing to rank.
+        </p>
       ) : (
         <div className="scroll">
           <table className="ranked">
@@ -176,11 +182,9 @@ export function Learners({ filters }: { filters: Filters }) {
         </div>
       )}
 
-      {/* Only when rows were actually cut short. A gated response also sets
-          `truncated`, and saying "showing the first 0 of 288" there describes a
-          truncation that did not happen — the ranking is withheld, which the
-          panel above already explains. */}
-      {data.truncated && !data.gated && data.rows.length > 0 && (
+      {/* Only when rows were actually cut short, so it can never read
+          "showing the first 0 of 288". */}
+      {data.truncated && data.rows.length > 0 && (
         <p className="muted small">
           Showing the first {data.rows.length} of {data.total_learners.toLocaleString()}. Narrow
           further, or export the attendance behind the figure.

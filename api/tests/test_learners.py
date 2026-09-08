@@ -50,19 +50,37 @@ class TestRanking:
         assert len(hours) == 1, "the fixture's two attendees tie on hours"
         assert [row.rank for row in ranked.rows] == [1, 1]
 
-    def test_the_names_are_withheld_until_a_scope_is_chosen(self, loaded: Session) -> None:
-        """The same rule the zero-training list follows, from the other end.
+    def test_the_ranking_is_returned_without_narrowing(self, loaded: Session) -> None:
+        """The requirement, as a test.
 
-        A ranked, named list of employees by hours is a leaderboard, and nobody
-        on it chose to be ranked. The distribution is not the sensitive part and
-        is returned either way.
+        "A top-learners ranking by learning hours, derived automatically,
+        replacing the hand-typed sheet" — and the sheet it replaces was
+        company-wide. This ranking was gated when it was first built, which
+        left a screen headed "Top learners" showing no learners.
         """
-        ungated = learners.top_learners(loaded, MetricFilters())
+        ranking = learners.top_learners(loaded, MetricFilters())
 
-        assert ungated.gated is True
-        assert ungated.rows == ()
-        assert ungated.total_learners == 2
-        assert ungated.hours_max is not None
+        assert ranking.rows, "the whole-company ranking must not be empty"
+        assert ranking.total_learners == 2
+        assert all(row.name for row in ranking.rows)
+
+    def test_the_spread_is_over_everybody_not_the_rows_shown(self, loaded: Session) -> None:
+        """A median of the visible fifty is a different statistic under the
+        same label. It is computed over the ranked population and returned
+        beside the rows, not derived from them."""
+        one = learners.top_learners(loaded, MetricFilters(), limit=1)
+        whole = learners.top_learners(loaded, MetricFilters())
+
+        assert len(one.rows) == 1
+        assert one.total_learners == whole.total_learners
+        assert one.hours_median == whole.hours_median
+        assert one.truncated is True
+
+    def test_truncated_is_false_when_everybody_fits(self, loaded: Session) -> None:
+        """It once read "showing the first 0 of 288", which described a
+        truncation that had not happened."""
+        ranking = learners.top_learners(loaded, MetricFilters())
+        assert ranking.truncated is False
 
     def test_the_ranking_counts_the_same_people_the_metrics_do(self, loaded: Session) -> None:
         """Derived from `scope.attendances`, so it cannot drift from the figure.
@@ -117,16 +135,46 @@ class TestProfile:
 
 class TestSearch:
     def test_an_empty_query_returns_nothing(self, loaded: Session) -> None:
-        """ "Everybody, alphabetically" is the roster the gate exists to withhold."""
+        """ "Everybody, alphabetically" is a roster, and nobody asked for one."""
         assert learners.find(loaded, "") == []
         assert learners.find(loaded, "   ") == []
 
     def test_a_name_finds_the_person(self, loaded: Session) -> None:
         found = learners.find(loaded, "nour")
-        assert [row["full_name"] for row in found] == ["Nour Hassan"]
+        assert [row.name for row in found] == ["Nour Hassan"]
 
     def test_an_employee_code_finds_the_person(self, loaded: Session) -> None:
-        assert learners.find(loaded, "TAI-1001")[0]["employee_code"] == "TAI-1001"
+        assert learners.find(loaded, "TAI-1001")[0].employee_code == "TAI-1001"
+
+    def test_a_match_is_named_the_way_a_ranking_row_is(self) -> None:
+        """The guard against the bug this replaced.
+
+        `find` returned raw column names — `full_name`, `department_name` —
+        while the screen showing the results read `name` and `department`, so
+        every match rendered as an empty row with an empty link. Nothing could
+        catch it: the route declared `list[dict[str, Any]]`, which is a
+        contract neither mypy nor the front end's types can check.
+
+        The two lists sit on one screen and must speak one vocabulary.
+        """
+        from lnd.api.v1.learners import MatchOut, RankOut
+
+        shared = set(MatchOut.model_fields) - {"rank", "programs", "sessions", "hours"}
+        assert shared <= set(RankOut.model_fields), (
+            "the search result and the ranking row name the same attributes differently"
+        )
+
+    def test_a_match_carries_everything_the_result_line_shows(self, loaded: Session) -> None:
+        """Not just the fields the query happened to select.
+
+        `company` was absent from the select, so the subtitle under a search
+        hit could never have rendered it even once the names lined up.
+        """
+        found = learners.find(loaded, "nour")[0]
+        assert found.employee_key
+        assert found.name
+        assert found.employee_code is not None
+        assert hasattr(found, "company")
 
 
 class TestTheRankingIsNotABreakdown:

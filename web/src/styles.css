@@ -822,26 +822,13 @@ button.kpi-value:disabled { color: var(--ink-3); font-weight: 400; cursor: defau
 /* -------------------------------------------------------------- learners */
 /* The distribution, shown whether or not the names are. It carries no
    individual judgement, which is exactly why it is not gated. */
-.spread { margin: 0 0 22px; }
-.spread figcaption { font-size: 13.5px; color: var(--ink-2); margin-bottom: 9px; }
-.spread-track {
-  position: relative; height: 8px; border-radius: 4px;
-  background: var(--surface-2); overflow: visible;
+/* The population line. This was a gradient track with a median tick on it; the
+   geometry kept asserting things the numbers did not, so it is a sentence now
+   — see the comment on `Population` in Learners.tsx. */
+.population {
+  margin: 0 0 20px; font-size: 13.5px; color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
 }
-.spread-fill {
-  position: absolute; inset: 0; border-radius: 4px;
-  background: linear-gradient(90deg, var(--accent-soft), var(--series));
-}
-.spread-tick {
-  position: absolute; top: -4px; width: 2px; height: 16px;
-  background: var(--ink); border-radius: 1px; transform: translateX(-1px);
-}
-.spread-scale {
-  display: flex; justify-content: space-between;
-  margin-top: 6px; font: 400 11.5px/1 var(--mono);
-  color: var(--ink-3); font-variant-numeric: tabular-nums;
-}
-.spread-median { color: var(--ink-2); }
 
 .learner-search { margin-bottom: 20px; max-width: 460px; }
 .learner-search input {
@@ -885,4 +872,75 @@ td.num, .ranked td.num {
   font-variant-numeric: tabular-nums;
   font-family: var(--mono);
   font-size: 12.5px;
+}
+
+/* ------------------------------------------------------------- saved views */
+/* The control sits in the filter bar and borrows its button styling: it is one
+   more thing you do to the filters, not a separate feature with its own look. */
+.views { position: relative; margin-left: auto; }
+.views-menu {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  z-index: 30;
+  width: 380px; max-height: 420px; overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+}
+.views-row { display: flex; align-items: stretch; gap: 2px; }
+.views-open {
+  /* Grid with an explicit `minmax(0, 1fr)` track, not a flex column. A button
+     lays its children out inside an anonymous box that sizes to max-content,
+     so a flex child there never shrinks and the scope sentence gets clipped
+     mid-word instead of ellipsed. The zero-minimum track is what forces it. */
+  flex: 1; min-width: 0;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px;
+  font: inherit; text-align: left;
+  padding: 7px 9px; border: 0; border-radius: 5px;
+  background: none; color: var(--ink); cursor: pointer;
+}
+.views-open:hover { background: var(--surface-2); }
+.views-name { font-size: 13.5px; font-weight: 500; }
+.views-describes,
+.views-owner {
+  font-size: 11.5px; color: var(--ink-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.views-delete {
+  font: inherit; font-size: 16px; line-height: 1;
+  border: 0; background: none; color: var(--ink-3);
+  cursor: pointer; padding: 0 8px; border-radius: 5px;
+}
+.views-delete:hover { background: var(--bad-soft); color: var(--bad); }
+.views-save {
+  display: flex; gap: 6px;
+  padding: 8px 8px 4px;
+  border-top: 1px solid var(--rule);
+  margin-top: 4px;
+}
+.views-save input {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px;
+  padding: 6px 9px;
+  border: 1px solid var(--rule); border-radius: 6px;
+  background: var(--surface); color: var(--ink);
+}
+.views-save input:disabled { color: var(--ink-3); background: var(--surface-2); }
+.views-save button {
+  font: inherit; font-size: 13px; font-weight: 500;
+  padding: 6px 12px;
+  border: 1px solid var(--accent); border-radius: 6px;
+  background: var(--accent-soft); color: var(--accent); cursor: pointer;
+}
+.views-save button:disabled { border-color: var(--rule); background: var(--surface-2); color: var(--ink-3); cursor: default; }
+.views-scope, .views-error { margin: 0; padding: 2px 9px 8px; font-size: 11.5px; color: var(--ink-3); }
+
+/* ---------------------------------------------------------------- editions */
+/* Eight characters of the digest, in the monospace face, so two editions of one
+   month can be compared at a glance. The full value is in the title. */
+.digest {
+  font: 400 11.5px/1 var(--mono);
+  color: var(--ink-3);
+  background: var(--surface-2);
+  padding: 2px 5px; border-radius: 4px;
 }
