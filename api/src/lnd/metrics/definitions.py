@@ -46,6 +46,15 @@ LEARNER_DIMENSIONS = frozenset(
         Dimension.PROGRAM_TARGET,
     }
 )
+#: Attendance-grain metrics can honour a trainer as well, because an attendance
+#: joins to its session and a session names its trainer — `scope.attendances`
+#: implements it. Deliberately not extended to the evaluation- or
+#: enrollment-grain metrics: a survey response belongs to a programme, not to a
+#: session, and an enrollment names no trainer at all. Narrowing Survey Response
+#: Rate by trainer would filter its denominator and not its numerator, which is
+#: the shape of P-13 and would read as a plausible number.
+ATTENDANCE_DIMENSIONS = LEARNER_DIMENSIONS | {Dimension.TRAINER}
+
 PROGRAM_DIMENSIONS = frozenset(
     {
         Dimension.PERIOD,
@@ -163,7 +172,7 @@ TOTAL_PARTICIPANTS = TotalParticipants(
         population=pop.ATTENDANCES,
         provenance=Provenance.UNCHANGED,
         unit=Unit.COUNT,
-        supports=LEARNER_DIMENSIONS,
+        supports=ATTENDANCE_DIMENSIONS,
     )
 )
 
@@ -185,7 +194,7 @@ LEARNER_HOURS = LearnerHours(
         population=pop.ATTENDANCES,
         provenance=Provenance.UNCHANGED,
         unit=Unit.HOURS,
-        supports=LEARNER_DIMENSIONS,
+        supports=ATTENDANCE_DIMENSIONS,
     )
 )
 
@@ -742,18 +751,12 @@ class CoverageGap(ScalarMetric):
     """
 
     def _measure(self, session: Session, filters: MetricFilters) -> tuple[Decimal | None, int]:
-        eligible = scope.enrollable_employees(filters.without(Dimension.PERIOD)).subquery()
-        attended = scope.attendances(filters).subquery()
-        untrained = (
-            session.scalar(
-                select(func.count())
-                .select_from(eligible)
-                .where(eligible.c.employee_key.not_in(select(attended.c.employee_key)))
-            )
-            or 0
-        )
-        headcount = session.scalar(select(func.count()).select_from(eligible)) or 0
-        return Decimal(untrained), int(headcount)
+        # The same statement the coverage view lists. Counting one expression
+        # and listing another is how a list of 1,268 names comes to sit under a
+        # heading that says 1,469.
+        untrained = scope.count_of(session, scope.untrained_employees(filters))
+        eligible = scope.enrollable_employees(filters.without(Dimension.PERIOD))
+        return Decimal(untrained), scope.count_of(session, eligible)
 
 
 COVERAGE_GAP = CoverageGap(

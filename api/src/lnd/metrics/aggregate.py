@@ -68,7 +68,7 @@ class Trend:
     points: tuple[Slice, ...]
 
 
-def _employee_values(session: Session, column_name: str) -> list[str]:
+def employee_values(session: Session, column_name: str) -> list[str]:
     column = getattr(DimEmployee, column_name)
     statement = (
         select(column)
@@ -79,7 +79,7 @@ def _employee_values(session: Session, column_name: str) -> list[str]:
     return [str(value) for value in session.scalars(statement)]
 
 
-def _program_values(session: Session, column_name: str) -> list[str]:
+def program_values(session: Session, column_name: str) -> list[str]:
     column = getattr(DimProgram, column_name)
     statement = (
         select(column)
@@ -90,29 +90,13 @@ def _program_values(session: Session, column_name: str) -> list[str]:
     return [str(value) for value in session.scalars(statement)]
 
 
-def _narrow(filters: MetricFilters, dimension: Dimension, value: str) -> MetricFilters:
-    """The same filters, plus one dimension pinned to one value."""
-    one: frozenset[str] = frozenset({value})
-    if dimension is Dimension.SECTOR:
-        return MetricFilters(**{**vars(filters), "sectors": one})
-    if dimension is Dimension.DEPARTMENT:
-        return MetricFilters(**{**vars(filters), "departments": one})
-    if dimension is Dimension.COMPANY:
-        return MetricFilters(**{**vars(filters), "companies": one})
-    if dimension is Dimension.JOB_LEVEL:
-        return MetricFilters(**{**vars(filters), "job_levels": one})
-    if dimension is Dimension.PROGRAM_TYPE:
-        return MetricFilters(**{**vars(filters), "program_types": one})
-    if dimension is Dimension.PROGRAM_TARGET:
-        return MetricFilters(**{**vars(filters), "program_targets": one})
-    if dimension is Dimension.PROGRAM:
-        return MetricFilters(**{**vars(filters), "program_ids": frozenset({int(value)})})
-    if dimension is Dimension.TRAINER:
-        return MetricFilters(**{**vars(filters), "trainer_keys": frozenset({int(value)})})
-    raise UnsupportedFilter(f"{dimension} cannot be broken down by value")
+#: A slice is one dimension pinned to one value, which is what a scorecard is
+#: too. `MetricFilters.narrowed_to` is the one implementation of that, so the
+#: two cannot disagree about what "this programme" narrows.
+_narrow = MetricFilters.narrowed_to
 
 
-_SLICE_SOURCES: dict[Dimension, tuple[str, str]] = {
+SLICE_SOURCES: dict[Dimension, tuple[str, str]] = {
     Dimension.SECTOR: ("employee", "sector"),
     Dimension.DEPARTMENT: ("employee", "department_name"),
     Dimension.COMPANY: ("employee", "company_name"),
@@ -147,11 +131,11 @@ def breakdown(
     if dimension is Dimension.PERIOD:
         raise UnsupportedFilter("period is a trend, not a breakdown — use /trend")
 
-    source, column = _SLICE_SOURCES[dimension]
+    source, column = SLICE_SOURCES[dimension]
     values = (
-        _employee_values(session, column)
+        employee_values(session, column)
         if source == "employee"
-        else _program_values(session, column)
+        else program_values(session, column)
     )
     kept, omitted = values[:MAX_SLICES], max(len(values) - MAX_SLICES, 0)
 

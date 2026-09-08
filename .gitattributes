@@ -1,0 +1,37 @@
+# Line endings, decided here rather than by whoever cloned the repository.
+#
+# Git on Windows checks files out with CRLF by default. That is harmless for
+# source we only ever read, and fatal for a file Linux has to *execute*: the
+# shebang becomes `#!/bin/sh\r`, the kernel looks for an interpreter literally
+# named `sh\r`, and the container dies with
+#
+#     /docker-entrypoint-initdb.d/01-app-role.sh: /bin/sh^M: bad interpreter
+#
+# which it did. Postgres then aborts initialisation, restarts, finds a data
+# directory already present, skips the scripts entirely and comes up *healthy*
+# without the application role ever having been created. The failure is one
+# line deep in a log nobody reads and the symptom arrives later, as the API
+# failing to authenticate against a database that looks fine.
+#
+# `eol=lf` on everything the container runs or reads means the bytes in the
+# image are the bytes in the repository, whatever the developer's platform.
+
+* text=auto
+
+# Executed inside Linux containers.
+*.sh text eol=lf
+docker/** text eol=lf
+Makefile text eol=lf
+
+# Read by tools that are whitespace-sensitive or that ship into images.
+*.yaml text eol=lf
+*.yml text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
+
+# Compared byte for byte by the golden-value suite. Gzip is binary and must
+# never be line-ending converted; the JSON beside it is diffed by people.
+*.gz binary
+*.xlsx binary
+*.pdf binary
+*.docx binary

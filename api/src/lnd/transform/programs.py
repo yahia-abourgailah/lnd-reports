@@ -66,6 +66,7 @@ from lnd.sources.crm.models import (
     SurveyAnswer,
     User,
 )
+from lnd.transform import trainer_kind
 from lnd.transform.conform import normalise, trim
 from lnd.transform.exceptions import ExceptionRecorder
 from lnd.transform.identity import IdentityResolver, Resolution
@@ -262,10 +263,23 @@ class TrainerRegistry:
         # two overlapping passes seeing the same new trainer would otherwise
         # both insert and one would fail the unique constraint, taking an
         # otherwise good transform down with it.
+        placeholder, external = trainer_kind.classify(canonical)
         self.session.execute(
             insert(DimTrainer)
-            .values(canonical_name=canonical, normalised_name=normalised)
-            .on_conflict_do_nothing(constraint="uq_dim_trainer_canonical_name")
+            .values(
+                canonical_name=canonical,
+                normalised_name=normalised,
+                is_placeholder=placeholder,
+                is_external=external,
+            )
+            # Set on conflict as well as on insert. The classification is
+            # derived, so a row created before the list knew about a name must
+            # pick the answer up on the next pass rather than keep the old one
+            # until somebody drops `core`.
+            .on_conflict_do_update(
+                constraint="uq_dim_trainer_canonical_name",
+                set_={"is_placeholder": placeholder, "is_external": external},
+            )
         )
         trainer_key = self.session.execute(
             select(DimTrainer.trainer_key).where(DimTrainer.canonical_name == canonical)

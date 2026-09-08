@@ -200,6 +200,17 @@ definition available to disagree with the first.
 /v1/enrichment/{kind}          the decisions layered over the CRM
 ```
 
+The week-7 views are assemblies of those same metrics, never a second
+computation of them:
+
+```
+/v1/programs · /{id}/scorecard  sessions, fill, no-show, quality, every comment
+/v1/trainers · /{key}/scorecard what they delivered, and how it was received
+/v1/coverage?by=                participation and the gap, sliced
+/v1/coverage/untrained          the people with no training, once a scope is set
+/v1/funnel · /{stage}           enrolled → attended → evaluated, and its rows
+```
+
 Every response carries **freshness**, the **filters applied**, and how many rows
 were **excluded** or merely **flagged** — two different things that share the
 data-quality queue and must never be reported as one.

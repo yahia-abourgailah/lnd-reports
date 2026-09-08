@@ -20,7 +20,7 @@ from sqlalchemy import text
 from lnd.ingest.landing import land
 from lnd.ingest.models import Entity, Source
 from lnd.transform.runner import transform_programs
-from tests.test_metrics import program
+from tests.fixtures.metrics_dataset import program
 
 #: `app.survey_question_map` is deliberately absent. Migration 0009 seeds it and
 #: several other tests read those rows straight from the migrated database, so a
