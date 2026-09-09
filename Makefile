@@ -149,6 +149,45 @@ test: test-db ## pytest with coverage
 .PHONY: check
 check: lint types test ## Everything CI runs on the API
 
+# ----------------------------------------------------------------- week 10
+# The four evidence documents. Each is generated from the running system rather
+# than written, so a claim in one of them cannot outlive the thing it describes.
+# All of them write into docs/, which the dev overlay mounts — outside dev they
+# would write into a container and be thrown away, which looks like success.
+DC := docker compose $(DEV) exec -T api
+
+.PHONY: parallel-run
+parallel-run: ## Live platform against the workbook; fails on an unexplained difference
+	$(DC) python -m lnd.reference.parallel
+
+.PHONY: security-review
+security-review: ## Regenerate the PII and security review from the running system
+	$(DC) python -m lnd.reference.security
+
+.PHONY: perf
+perf: ## p95 at the BRD's 15,000-record ceiling, in a scratch database
+	@u=$$(grep -E '^POSTGRES_USER=' .env | cut -d= -f2); \
+	 p=$$(grep -E '^POSTGRES_PASSWORD=' .env | cut -d= -f2); \
+	 docker compose $(DEV) exec -T db psql -U $$u -d postgres -tAc \
+	   "SELECT 1 FROM pg_database WHERE datname='lnd_perf'" | grep -q 1 \
+	   || docker compose $(DEV) exec -T db createdb -U $$u lnd_perf; \
+	 docker compose $(DEV) run --rm --no-deps \
+	   -e DATABASE_URL="postgresql+psycopg://$$u:$$p@db:5432/lnd_perf" \
+	   api alembic upgrade head >/dev/null; \
+	 $(DC) python -m lnd.reference.perf \
+	   --database-url "postgresql+psycopg://$$u:$$p@db:5432/lnd_perf"
+
+.PHONY: backup
+backup: ## One verified dump into ./backups, pruned at 30 days
+	scripts/backup.sh
+
+.PHONY: restore-rehearsal
+restore-rehearsal: ## Back up, restore into a scratch database, and prove it is the same platform
+	scripts/restore-rehearsal.sh
+
+.PHONY: evidence
+evidence: parallel-run security-review restore-rehearsal ## Every week-10 document that does not need a scratch database
+
 .PHONY: web-check
 web-check: ## Type-check and build the front end
 	cd web && npm run typecheck && npm run build

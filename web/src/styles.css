@@ -16,7 +16,13 @@
   --surface-2: #eaeef0;
   --ink: #12181a;
   --ink-2: #475357;
-  --ink-3: #77858a;
+  /* Darkened in week 10 from #77858a, which failed WCAG AA on all three
+     surfaces — 3.81:1 on white, 3.48 on the ground, 3.26 on surface-2 against
+     a 4.5 floor. It is the colour every secondary line uses: the sample size
+     under a figure, the note under an enrichment row, the definition text. One
+     token accounted for 150 of the 153 violations found, which is the shape a
+     design-system failure has. This clears 4.5:1 on the darkest of the three. */
+  --ink-3: #586469;
   --rule: #dbe1e4;
   --rule-soft: #eceff1;
 
@@ -48,7 +54,10 @@
     --surface-2: #1d2628;
     --ink: #e5edec;
     --ink-2: #aab8b7;
-    --ink-3: #7a8a89;
+    /* Same correction on the dark side: #7a8a89 cleared white-on-dark at the
+       top surface and fell to 4.28:1 on surface-2, which is where most of the
+       secondary text actually sits. */
+    --ink-3: #8b9b9a;
     --rule: #263031;
     --rule-soft: #1e2728;
 
@@ -182,7 +191,12 @@ body {
   white-space: nowrap;
 }
 .badge-dot { width: 7px; height: 7px; border-radius: 50%; background: currentcolor; }
-.badge-lag { font: 400 11.5px/1 var(--mono); opacity: 0.75; }
+/* No `opacity` here. It read as a quieter version of the badge's own colour and
+   is in fact a different colour — 0.75 took the freshness lag from 5.4:1 to
+   3.43:1 against the badge ground, so the one element on screen whose job is to
+   say the data might be stale was the least legible thing on it. Weight and
+   size carry the hierarchy instead. */
+.badge-lag { font: 400 11.5px/1 var(--mono); }
 .badge-ok   { background: var(--ok-soft);   color: var(--ok); }
 .badge-warn { background: var(--warn-soft); color: var(--warn); }
 .badge-bad  { background: var(--bad-soft);  color: var(--bad); }
@@ -463,7 +477,11 @@ button.kpi-value:disabled { color: var(--ink-3); font-weight: 400; cursor: defau
 .exclusion-clear { background: var(--ok-soft); color: var(--ok); }
 /* The flagged count sits inside the banner but must not read as part of the
    headline claim — it is context, not a loss. */
-.exclusion-aside { opacity: 0.82; }
+/* Opacity again, and the same lesson as `.badge-lag`: 0.82 turned the ok green
+   into a colour nobody chose, at 3.92:1. The aside is the sentence explaining
+   that flagged records are not excluded ones — the distinction the banner got
+   wrong in week 6 — so it is not a detail to fade. */
+.exclusion-aside { font-weight: 400; }
 .exclusion-some { background: var(--warn-soft); color: var(--warn); }
 
 /* ------------------------------------------------------------- the drawer */
@@ -517,7 +535,11 @@ button.kpi-value:disabled { color: var(--ink-3); font-weight: 400; cursor: defau
   padding: 0 22px 8px; font-size: 12.5px; color: var(--ink-2);
 }
 .grid-count { font-variant-numeric: tabular-nums; }
-.grid-head, .grid-row {
+/* The columns are laid out on the header *row*, not on the rowgroup that wraps
+   it: the rowgroup exists so the ARIA tree is a table, and giving it a grid
+   display as well would put the row and the group in competition for the same
+   track sizing. */
+.grid-headrow, .grid-row {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
@@ -537,7 +559,11 @@ button.kpi-value:disabled { color: var(--ink-3); font-weight: 400; cursor: defau
 }
 .grid-th:hover { color: var(--ink); }
 .grid-sorted { color: var(--accent); }
+/* Focusable, so it needs to show that it is. Outline inside the box: an
+   outline on a scroll container clips against its own overflow and a keyboard
+   user gets three visible edges out of four. */
 .grid-body { overflow: auto; }
+.grid-body:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .grid-row {
   height: 33px; align-items: center;
   border-bottom: 1px solid var(--rule-soft);
@@ -636,7 +662,18 @@ button.kpi-value:disabled { color: var(--ink-3); font-weight: 400; cursor: defau
   background: var(--surface-2);
 }
 .table tr:last-child td { border-bottom: 0; }
-.table a { color: var(--accent); text-decoration: none; }
+/* Underlined, not merely coloured. A link that sits beside plain text in the
+   same cell — a trainer's name next to the marks saying they are a placeholder
+   or an outside vendor — is distinguished from that text by 2.42:1 of colour
+   alone, which anybody who does not see the hue reads as one run of words.
+   Faint, so a column of them still scans as a column. */
+.table a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  text-underline-offset: 2px;
+}
+.table a:hover { text-decoration-color: currentcolor; }
 .table a:hover { text-decoration: underline; }
 
 .card-head { margin: 4px 0 18px; }

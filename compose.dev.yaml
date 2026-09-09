@@ -30,6 +30,17 @@ services:
     volumes:
       - ./api/src:/srv/src:ro
       - ./api/alembic:/srv/alembic:ro
+      # The generators — golden, reconcile, parallel — read and write files that
+      # live in the repository rather than in the image: the frozen dataset and
+      # its golden figures, and the two documents the stakeholder gate turns on.
+      # Without these mounts they run happily and write into a container that is
+      # then thrown away, which looks exactly like success.
+      #
+      # Writable, and dev only. The runtime never touches either path: nothing
+      # under `lnd.api` or `lnd.worker` reads them, so staging and production
+      # keep the image's own copy and no mount at all.
+      - ./api/tests:/srv/tests
+      - ./docs:/docs
     environment:
       PYTHONPATH: /srv/src
 

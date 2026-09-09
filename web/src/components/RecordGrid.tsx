@@ -112,7 +112,16 @@ export function RecordGrid({
         </button>
       </div>
 
-      <div className="grid-head" role="row">
+      {/* A real table structure, not rows floating in a div. The virtualiser
+          puts two positioning elements between the scroll container and the
+          rows — a spacer that keeps the scrollbar honest and an absolutely
+          placed slice — and an ARIA row must be owned by a rowgroup, so both
+          are marked presentational and disappear from the tree. Without that
+          every row reports "aria-required-parent" and a screen reader is handed
+          a list of cells belonging to nothing. */}
+      <div className="grid" role="table" aria-rowcount={ordered.length + 1}>
+      <div className="grid-head" role="rowgroup">
+      <div className="grid-headrow" role="row">
         {columns.map((column) => (
           <button
             key={column}
@@ -135,9 +144,16 @@ export function RecordGrid({
           </button>
         ))}
       </div>
+      </div>
 
       <div
         className="grid-body"
+        role="rowgroup"
+        // Focusable, because it scrolls. A region a mouse can scroll and a
+        // keyboard cannot reach is the whole of `scrollable-region-focusable`,
+        // and here it is the only way to see rows 41 onwards.
+        tabIndex={0}
+        aria-label="Records"
         ref={viewport}
         style={{ height }}
         onScroll={(event) => setOffset(event.currentTarget.scrollTop)}
@@ -145,8 +161,14 @@ export function RecordGrid({
         {/* One tall spacer holds the scrollbar honest while only `window` is
             rendered — the scroll position must reflect the whole list, not the
             slice. */}
-        <div style={{ height: ordered.length * ROW_HEIGHT, position: 'relative' }}>
-          <div style={{ position: 'absolute', top: first * ROW_HEIGHT, left: 0, right: 0 }}>
+        <div
+          role="presentation"
+          style={{ height: ordered.length * ROW_HEIGHT, position: 'relative' }}
+        >
+          <div
+            role="presentation"
+            style={{ position: 'absolute', top: first * ROW_HEIGHT, left: 0, right: 0 }}
+          >
             {window.map((row, index) => (
               <div className="grid-row" role="row" key={first + index}>
                 {columns.map((column) => (
@@ -158,6 +180,7 @@ export function RecordGrid({
             ))}
           </div>
         </div>
+      </div>
       </div>
     </div>
   )
