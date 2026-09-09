@@ -11,6 +11,10 @@ somebody imagined.
 employees. Restore-from-backup is week 10 and is deliberately absent — see the
 last section.
 
+Two things that were unproven when this was first written are proven now: the
+mail relay has a preflight (§1) and single sign-on has run end to end against a
+real identity provider (§6).
+
 ---
 
 ## How the platform tells you
@@ -74,6 +78,39 @@ Rehearsed output:
 | `SMTPAuthenticationError` | Credentials rejected | Check `SMTP_USERNAME`/`SMTP_PASSWORD` against the relay |
 | `timed out` / `ConnectionRefusedError` | The relay is unreachable | Network or egress allowlist; the relay must be reachable from the worker |
 | `SSLCertVerificationError` | The relay's certificate does not verify | Do not disable verification. The attachment carries employee names |
+
+### Before any of that: check the relay
+
+Do not wait for the first of the month to find out whether delivery works.
+
+```bash
+docker compose exec worker python -m lnd.delivery.preflight
+docker compose exec worker python -m lnd.delivery.preflight --send
+```
+
+The first connects, negotiates TLS and authenticates without sending anything.
+The second delivers one short message to the report's real recipients. Rehearsed
+against a relay:
+
+```
+  host        smtp.example.com:587
+  encryption  STARTTLS
+  username    lnd-analytics
+  recipients  ld@example.com, director@example.com
+
+OK   connected and authenticated — nothing was sent; add --send to deliver a test message
+OK   sent to ld@example.com, director@example.com
+```
+
+Unconfigured it says so in one line rather than in a stack trace:
+
+```
+FAIL SMTP_HOST is not set, so nothing is sent and nothing can be.
+```
+
+Run it the moment IT hand over credentials, and again after any change to the
+relay. It is not an endpoint on purpose: anyone able to trigger mail from a
+browser can use this platform to send mail.
 
 ### Send it again — do not regenerate it
 
@@ -249,6 +286,46 @@ Five entries, and none of them is a stub any more:
 The transform is five minutes behind the sync rather than chained to it, so it
 still runs — and still produces a correct `core` — on a morning when the CRM is
 down and no sync succeeded.
+
+---
+
+## 6. Single sign-on
+
+The OIDC flow has been exercised end to end — discovery, PKCE with S256, code
+exchange, RS256 signature against the provider's JWKS, issuer, audience, expiry
+and nonce — against a **real identity provider** running in the test suite
+(`tests/idp.py`). It also refuses what it should: a tampered state, a replayed
+code, a callback with no in-flight request, and an error from the provider. None
+of those issues a session.
+
+What that does **not** prove is that Microsoft Entra is configured correctly. It
+proves the client is. When the registration arrives, three settings go in:
+
+```
+OIDC_DISCOVERY_URL   https://login.microsoftonline.com/<tenant>/v2.0/.well-known/openid-configuration
+OIDC_CLIENT_ID       the application (client) ID
+OIDC_CLIENT_SECRET   a client secret
+```
+
+and the redirect URI registered with Entra must equal `OIDC_REDIRECT_URI`
+exactly, including the scheme. The API refuses to start outside dev without all
+three, which is the guard working rather than a fault.
+
+**A failed sign-in redirects; it does not show an error page.** The browser
+lands back on the application with `?auth_error=<reason>` and the detail goes to
+the log — never into the query string. The reasons are `provider_error`,
+`expired`, `invalid_response`, `state_mismatch`, `verification_failed` and
+`unavailable`, and each names a different place to look.
+
+To rehearse the whole flow by hand without Entra:
+
+```bash
+python -m tests.idp 9500          # a real OIDC provider on localhost
+```
+
+then point `OIDC_DISCOVERY_URL` at
+`http://127.0.0.1:9500/.well-known/openid-configuration`, set the client id to
+`lnd-analytics` and the secret to `test-secret`, and sign in with a browser.
 
 ---
 

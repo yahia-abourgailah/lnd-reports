@@ -103,7 +103,7 @@ def _message(
     return message
 
 
-def _connect(settings: Settings) -> smtplib.SMTP | smtplib.SMTP_SSL:
+def connect(settings: Settings) -> smtplib.SMTP | smtplib.SMTP_SSL:
     """Open the connection the settings describe.
 
     `create_default_context` rather than a bare `starttls()`: the default
@@ -158,7 +158,7 @@ def send(
     )
 
     try:
-        with _connect(settings) as connection:
+        with connect(settings) as connection:
             if settings.smtp_username:
                 connection.login(settings.smtp_username, settings.smtp_password)
             connection.send_message(message)
@@ -184,4 +184,4 @@ def send(
     return Delivery(sent=True, recipients=tuple(to))
 
 
-__all__ = ["Attachment", "Delivery", "NotConfigured", "send"]
+__all__ = ["Attachment", "Delivery", "NotConfigured", "connect", "send"]

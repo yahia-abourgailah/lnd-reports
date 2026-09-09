@@ -431,11 +431,17 @@ Weeks 1–9 are built and verified against the live CRM. What remains before an
 L&D specialist can use this unaided:
 
 - **The Microsoft Entra app registration.** Three blank settings, and the API
-  refuses to start outside dev without them. Nothing else blocks staging.
+  refuses to start outside dev without them. The client itself is proven: the
+  whole flow — discovery, PKCE, code exchange, RS256 signature against the
+  provider's JWKS, issuer, audience, expiry and nonce — runs end to end in CI
+  against a real identity provider (`api/tests/idp.py`), and refuses a tampered
+  state, a replayed code and a callback with no in-flight request. What is
+  missing is the registration, not the code.
 - **An SMTP relay and a recipient list.** `SMTP_HOST` and `REPORT_RECIPIENTS`
   are blank, so the monthly job generates and keeps its editions and sends
-  nothing. The path is tested end to end against a real SMTP conversation; what
-  is missing is a relay to point it at.
+  nothing. Delivery is tested against a real SMTP conversation, and
+  `python -m lnd.delivery.preflight` answers "will this work" in ten seconds the
+  moment credentials arrive — rather than on the first of the month.
 - **The L&D walkthrough.** Every figure computes and every difference has a
   written reason; nobody outside the team has seen 9.3% yet, and the plan is
   explicit that it should not arrive alongside a dashboard.
