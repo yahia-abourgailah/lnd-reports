@@ -1358,10 +1358,11 @@ button.kpi-value:disabled,
 /* ------------------------------------------------------------ grouped bars */
 .grouped-plot {
   display: flex; align-items: flex-end; gap: 6px;
-  height: 150px;
-  /* Room above the plot for the tallest bar's own number, which sits 13px
-     over it and was being clipped by the panel. */
-  padding-top: 14px;
+  height: 156px;
+  /* Room above the plot for the tallest bar's own number, which sits 13px over
+     it. 14px was not enough — the tallest column reached the top and its label
+     was cut in half by the panel. */
+  padding-top: 20px;
   overflow-x: auto;
 }
 .grouped-col { display: flex; flex-direction: column; gap: 5px; flex: 1 1 0; min-width: 34px; }
@@ -1374,13 +1375,21 @@ button.kpi-value:disabled,
 }
 .gbar span {
   position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+  /* Never wraps: the tallest bar's number sat half over the panel edge and
+     rendered as two dashes. */
+  white-space: nowrap;
   font: 400 9.5px/1 var(--mono);
   color: var(--brand-ink-2);
   font-variant-numeric: tabular-nums;
 }
+/* The same three colours as `.key-*`, in the same order, because they name the
+   same series. They did not: `.key-b` was blue while `.gbar-b` was orange, so
+   the legend said the tall bars were programmes when they were participants —
+   75 programmes in a December that ran five. A legend that contradicts its own
+   chart is worse than no legend, because it is read. */
 .gbar-a { background: var(--series); }
-.gbar-b { background: var(--figure-mark); }
-.gbar-c { background: var(--series-2); }
+.gbar-b { background: var(--series-2); }
+.gbar-c { background: var(--figure-mark); }
 .grouped-label {
   font: 400 10.5px/1 var(--mono);
   color: var(--brand-ink-2);

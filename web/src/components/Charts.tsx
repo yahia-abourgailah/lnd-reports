@@ -35,6 +35,14 @@
 /** A number formatted the way the rest of the dashboard formats numbers. */
 const n = (value: number) => value.toLocaleString()
 
+/** Series colours, by position.
+ *
+ *  One list, read by the legend and by the marks. They used to be two, and the
+ *  second entry disagreed: the key drew blue and the bars drew orange, so the
+ *  legend attributed 80 participants to programmes. Anything that renders a
+ *  swatch and a mark for the same series takes its class from here. */
+const TONES = ['a', 'b', 'c'] as const
+
 function Empty({ label }: { label: string }) {
   return <p className="chart-empty">{label}</p>
 }
@@ -120,13 +128,17 @@ export function GroupedBars({
 }) {
   if (groups.length === 0) return <Empty label="No months in scope." />
   const top = Math.max(...groups.flatMap((group) => group.values), 1)
+  const tallestSeries = groups
+    .flatMap((group) => group.values.map((value, index) => ({ value, index })))
+    .reduce((best, entry) => (entry.value > best.value ? entry : best), { value: -1, index: 0 })
+    .index
 
   return (
     <div className="grouped">
       <ul className="chart-key">
         {series.map((name, index) => (
           <li key={name}>
-            <span className={`key-swatch key-${['a', 'b', 'c'][index]}`} />
+            <span className={`key-swatch key-${TONES[index]}`} />
             {name}
           </li>
         ))}
@@ -147,7 +159,7 @@ export function GroupedBars({
             <div className="grouped-bars">
               {group.values.map((value, index) => (
                 <div
-                  className={`gbar gbar-${['a', 'b', 'c'][index]}`}
+                  className={`gbar gbar-${TONES[index]}`}
                   key={series[index]}
                   style={{ height: `${(value / top) * 100}%` }}
                   title={`${group.label} · ${series[index]}: ${n(value)}`}
@@ -167,8 +179,12 @@ export function GroupedBars({
       </div>
       {/* The workbook printed a number beside every bar and drew no axis at
           all, so two charts of different magnitudes read as the same size.
-          Stating the maximum is the cheapest way to stop that. */}
-      <p className="chart-scale">tallest bar = {n(top)}</p>
+          Stating the maximum is the cheapest way to stop that — and it names
+          the series, because three counts share this scale and "80" on its own
+          invites reading it against whichever bar the eye landed on. */}
+      <p className="chart-scale">
+        tallest bar = {n(top)} {series[tallestSeries]?.toLowerCase()}
+      </p>
     </div>
   )
 }
@@ -201,7 +217,7 @@ export function Bars({
         <ul className="chart-key">
           {series.map((name, index) => (
             <li key={name}>
-              <span className={`key-swatch key-${['a', 'b'][index]}`} />
+              <span className={`key-swatch key-${TONES[index]}`} />
               {name}
             </li>
           ))}
@@ -216,7 +232,7 @@ export function Bars({
             <span className="cbar-track">
               {row.values.map((value, index) => (
                 <span
-                  className={`cbar cbar-${['a', 'b'][index]}`}
+                  className={`cbar cbar-${TONES[index]}`}
                   key={series[index]}
                   style={{ width: `${(value / top) * 100}%` }}
                   title={`${row.label} · ${series[index]}: ${n(value)}`}
