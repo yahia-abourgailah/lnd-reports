@@ -167,6 +167,15 @@ def breakdown(
     )
 
 
+def _today() -> dt.date:
+    """Today, behind a seam so the clamp in `trend` can be tested.
+
+    It only bites in the month in progress, and no fixture can contain the
+    month in progress without being rebuilt every month.
+    """
+    return dt.date.today()
+
+
 def _months(session: Session, filters: MetricFilters) -> list[dt.date]:
     """Every month the data spans, oldest first.
 
@@ -206,6 +215,10 @@ def trend(metric_key: str, session: Session, filters: MetricFilters | None = Non
     Participation Rate is the exception that proves the design — its numerator
     narrows to the month while its denominator stays the headcount at period
     end, because that asymmetry is declared inside the metric rather than here.
+    Months Since Last Training is the other: it reads the month's last day as
+    an as-of date and ignores its first, so its trend is staleness at each
+    month end rather than a row of near-zeroes. Both asymmetries live in the
+    metric. A metric that needs one says so itself; this function stays dumb.
     """
     metric = registry.get(metric_key)
     applied = filters or MetricFilters()
@@ -214,16 +227,23 @@ def trend(metric_key: str, session: Session, filters: MetricFilters | None = Non
     if Dimension.PERIOD not in metric.spec.supports:
         raise UnsupportedFilter(f"{metric_key} has no period to trend over")
 
+    today = _today()
+
     points: list[Slice] = []
     for month in _months(session, applied):
-        last_day = calendar.monthrange(month.year, month.month)[1]
-        windowed = MetricFilters(
-            **{
-                **vars(applied),
-                "date_from": month,
-                "date_to": month.replace(day=last_day),
-            }
-        )
+        end = month.replace(day=calendar.monthrange(month.year, month.month)[1])
+        # For a metric measuring *at* the window's end, the month in progress
+        # ends today. Asked for its last day it would answer how stale the
+        # company will be three weeks from now — adding the unelapsed days to
+        # everybody at once and drawing a rise on the newest point, the one
+        # most looked at, that has not happened.
+        #
+        # Only that month, and only for that kind of metric. Four sessions in
+        # the dataset are scheduled after today, and clamping every window
+        # would drop them from the counts they belong in.
+        if metric.spec.period_is_an_as_of and month <= today < end:
+            end = today
+        windowed = MetricFilters(**{**vars(applied), "date_from": month, "date_to": end})
         points.append(
             Slice(
                 key=f"{month.year:04d}-{month.month:02d}",

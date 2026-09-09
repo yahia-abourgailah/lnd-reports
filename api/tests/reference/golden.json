@@ -396,12 +396,12 @@
       },
       "months_since_last_training": {
         "denominator": null,
-        "formatted": "2.3 months",
+        "formatted": "4.7 months",
         "numerator": null,
         "provenance": "new",
-        "sample_size": 147,
+        "sample_size": 287,
         "unit": "months",
-        "value": "2.30"
+        "value": "4.73"
       },
       "no_show_rate": {
         "denominator": "482.00",

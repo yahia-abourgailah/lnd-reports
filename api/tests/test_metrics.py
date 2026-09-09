@@ -270,3 +270,143 @@ class TestEstimatedTravelsWithThePopulation:
                 continue
             value = registry.compute(metric.spec.key, loaded, MetricFilters())
             assert value.is_estimated is False, metric.spec.key
+
+
+class TestMonthsSinceLastTrainingIsAStock:
+    """The period names a date to measure at, not a window to count within.
+
+    This one metric asks how stale a population is, and it was scoped like
+    every other: the window's start narrowed the people as well as fixing the
+    date. Filtered to August it answered 0.6 months — the median over people
+    who had trained in August, who had by definition just trained — and the
+    monthly trend was a row of near-zeroes that read as a trend and was an
+    artefact of the filter. The figure could never exceed the window's own
+    length, so a one-month view could never report more than one month however
+    stale the company was.
+
+    The dataset attends on 2 February 2026 and never again, which makes the
+    distinction visible: a March window contains no attendance at all, so the
+    old scoping had nobody to take a median over.
+    """
+
+    MARCH_END = dt.date(2026, 3, 31)
+
+    def test_a_window_with_no_attendance_still_has_a_population(self, loaded: Session) -> None:
+        """The question is "how long since these people trained", and March is
+        a perfectly good time to ask it. Answering `None` because nobody
+        trained in March is answering a different question."""
+        result = metrics.compute(
+            "months_since_last_training",
+            loaded,
+            MetricFilters(date_from=dt.date(2026, 3, 1), date_to=self.MARCH_END),
+        )
+
+        assert result.sample_size > 0
+        assert result.value is not None
+
+    def test_the_start_of_the_window_changes_nothing(self, loaded: Session) -> None:
+        """Same as-of date, same answer, however far back the window reaches.
+        This is the assertion the defect would have failed."""
+        bounded = metrics.compute(
+            "months_since_last_training",
+            loaded,
+            MetricFilters(date_from=dt.date(2026, 3, 1), date_to=self.MARCH_END),
+        )
+        unbounded = metrics.compute(
+            "months_since_last_training", loaded, MetricFilters(date_to=self.MARCH_END)
+        )
+
+        assert bounded.value == unbounded.value
+        assert bounded.sample_size == unbounded.sample_size
+
+    def test_the_answer_may_exceed_the_window(self, loaded: Session) -> None:
+        """A one-month window over a company that last trained in February must
+        be able to say so. Two months, not the 0.0 that a flow would give."""
+        result = metrics.compute(
+            "months_since_last_training",
+            loaded,
+            MetricFilters(date_from=dt.date(2026, 4, 1), date_to=dt.date(2026, 4, 30)),
+        )
+
+        assert result.value is not None
+        assert result.value > 2
+
+    def test_a_future_as_of_is_answered_not_clamped(self, loaded: Session) -> None:
+        """ "How stale will we be at Christmas, if nobody trains" is a fair
+        question, and `reference.windows` asks it on purpose: a golden file
+        pinned to "today" goes red overnight for no reason. The caller with no
+        business asking is the trend, and the trend is where it stops."""
+        future = metrics.compute(
+            "months_since_last_training",
+            loaded,
+            MetricFilters(date_to=dt.date.today() + dt.timedelta(days=90)),
+        )
+        today = metrics.compute("months_since_last_training", loaded, MetricFilters())
+
+        assert future.value is not None and today.value is not None
+        assert future.value > today.value
+
+    def test_the_trend_stops_the_month_in_progress_at_today(
+        self, loaded: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Every point is staleness at its month end, so the month in progress
+        would be asked for a date three weeks away and would answer, drawing a
+        rise on the newest point that has not happened.
+
+        The dataset attends on 2 February 2026, so standing inside February
+        makes the difference three days rather than nothing."""
+        from lnd.metrics import aggregate
+
+        mid_month = dt.date(2026, 2, 5)
+        monkeypatch.setattr(aggregate, "_today", lambda: mid_month)
+
+        point = aggregate.trend("months_since_last_training", loaded).points[-1]
+        as_at_today = metrics.compute(
+            "months_since_last_training", loaded, MetricFilters(date_to=mid_month)
+        )
+
+        assert point.key == "2026-02"
+        assert point.value.value == as_at_today.value
+
+    def test_the_trend_keeps_scheduled_sessions_in_their_month(
+        self, loaded: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The clamp is one metric's declaration, not a rule for every window.
+        Four sessions in the live dataset are dated after today; they are
+        scheduled, and a count of them belongs in the month they fall in."""
+        from lnd.metrics import aggregate
+
+        monkeypatch.setattr(aggregate, "_today", lambda: dt.date(2026, 2, 1))
+
+        # Additive metrics only — a count of distinct people does not sum
+        # across months, and asserting that it did would pass here by accident
+        # and mean nothing.
+        for key in ("training_days", "training_hours_delivered"):
+            points = aggregate.trend(key, loaded).points
+            counted = sum(p.value.value or 0 for p in points)
+            assert counted == metrics.compute(key, loaded, MetricFilters()).value, key
+
+    def test_the_caption_says_what_was_measured(self, loaded: Session) -> None:
+        """`filters_applied` is printed on the card and stamped on every
+        export. Describing a window the metric did not use would put a caption
+        on screen that the figure underneath does not answer."""
+        result = metrics.compute(
+            "months_since_last_training",
+            loaded,
+            MetricFilters(date_from=dt.date(2026, 3, 1), date_to=self.MARCH_END),
+        )
+
+        assert "2026-03-01" not in result.filters_applied
+        assert "2026-03-31" in result.filters_applied
+
+    def test_the_other_filters_still_apply(self, loaded: Session) -> None:
+        """Dropping the window's start is the only exception. "In Sales, as at
+        the end of March" is still a question with an answer, and a department
+        nobody trained in still has none."""
+        elsewhere = metrics.compute(
+            "months_since_last_training",
+            loaded,
+            MetricFilters(departments=frozenset({"Nowhere"}), date_to=self.MARCH_END),
+        )
+
+        assert elsewhere.sample_size == 0

@@ -77,9 +77,22 @@ PROGRAM_DIMENSIONS = frozenset(
 )
 
 
-def _population_is_estimated(
-    session: Session, spec: MetricSpec, filters: MetricFilters
-) -> bool:
+def _scoped(spec: MetricSpec, filters: MetricFilters) -> MetricFilters:
+    """The filters a metric's own measurement should see.
+
+    Identical to what the caller asked for, unless the metric has declared
+    `period_is_an_as_of` — in which case the window's start is dropped and only
+    its end survives, as the date to measure at. See that field for why.
+
+    Applied here rather than inside the one metric that needs it so that a
+    second such metric cannot be written without the trend hearing about it.
+    """
+    if not spec.period_is_an_as_of or filters.date_from is None:
+        return filters
+    return MetricFilters(**{**vars(filters), "date_from": None})
+
+
+def _population_is_estimated(session: Session, spec: MetricSpec, filters: MetricFilters) -> bool:
     """Whether this metric rests on employee rows the platform had to assume.
 
     Derived from the metric's declared population rather than remembered by each
@@ -97,9 +110,7 @@ def _population_is_estimated(
         return False
     eligible = scope.enrollable_employees(filters.without(Dimension.PERIOD)).subquery()
     return bool(
-        session.scalar(
-            select(func.count()).select_from(eligible).where(eligible.c.is_estimated)
-        )
+        session.scalar(select(func.count()).select_from(eligible).where(eligible.c.is_estimated))
     )
 
 
@@ -142,13 +153,18 @@ class ScalarMetric:
 
     def compute(self, session: Session, filters: MetricFilters) -> MetricValue:
         self.spec.reject_unsupported(filters)
-        total, rows = self._measure(session, filters)
+        # Scoped once and used for both. `filters_applied` is printed on the
+        # card and stamped on every export, so describing the window the caller
+        # asked for while measuring a different one would put a caption on the
+        # screen that the figure underneath does not answer.
+        scoped = _scoped(self.spec, filters)
+        total, rows = self._measure(session, scoped)
         return _value(
             self.spec,
-            filters,
+            scoped,
             value=total,
             sample_size=rows,
-            is_estimated=_population_is_estimated(session, self.spec, filters),
+            is_estimated=_population_is_estimated(session, self.spec, scoped),
         )
 
     def _measure(
@@ -177,11 +193,12 @@ class RatioMetric:
 
     def compute(self, session: Session, filters: MetricFilters) -> MetricValue:
         self.spec.reject_unsupported(filters)
-        ratio, sample_size, is_estimated = self._measure(session, filters)
+        scoped = _scoped(self.spec, filters)
+        ratio, sample_size, is_estimated = self._measure(session, scoped)
         raw = ratio.value
         return _value(
             self.spec,
-            filters,
+            scoped,
             value=None if raw is None else raw * self.factor,
             numerator=ratio.numerator,
             denominator=ratio.denominator,
@@ -824,6 +841,24 @@ class MonthsSinceLastTraining(ScalarMetric):
     once eighteen months ago, and a mean would report a number no individual is
     near. People who have never attended are the Coverage Gap and are excluded
     here — including them would need an infinity or a zero, and both lie.
+
+    THE PERIOD SETS THE DATE, NOT THE POPULATION
+
+    This is a stock, not a flow. Every other metric here counts what happened
+    *within* a window; this one asks how stale a population is *as at* a date,
+    and the two need opposite handling of the same filter.
+
+    Taking the start of the window as well made the answer meaningless and it
+    was published that way: filtered to August, it reported 0.6 months — the
+    median over people who trained in August, who had by definition just
+    trained. It could never exceed the window's own length, so a one-month view
+    could never report more than one month however stale the company was, and
+    the monthly trend was a row of near-zeroes that looked like a trend and was
+    an artefact of the filter.
+
+    So `date_to` fixes the as-of date and `date_from` is dropped. Every other
+    filter still applies: "months since last training, in Sales, as at the end
+    of August" is a question with an answer.
     """
 
     def _measure(self, session: Session, filters: MetricFilters) -> tuple[Decimal | None, int]:
@@ -839,11 +874,15 @@ class MonthsSinceLastTraining(ScalarMetric):
         # A literal date when one was asked for, the database's clock otherwise.
         # Bound as a Date so the subtraction stays date arithmetic — mixing a
         # Python date into it as text yields an interval Postgres will not take.
+        #
+        # A date in the future is answered rather than clamped, because it is a
+        # sensible thing to ask and `reference.windows` asks it deliberately: a
+        # golden file pinned to "today" goes red overnight for no reason. The
+        # caller that has no business asking is the monthly trend, and it is
+        # the trend that stops.
         as_of = (
             literal(filters.date_to, Date()) if filters.date_to is not None else func.current_date()
         )
-        # 30.4375 = 365.25 / 12. Calendar months are unequal, and "4.0 months
-        # since training" wants an even scale rather than a real one.
         # Subtracting two dates in PostgreSQL yields whole days as an integer,
         # not an interval — `extract(epoch from ...)` has nothing to take the
         # epoch of and the query fails outright.
@@ -870,6 +909,7 @@ MONTHS_SINCE_LAST_TRAINING = MonthsSinceLastTraining(
         unit=Unit.MONTHS,
         supports=PROFILE_DIMENSIONS,
         note="Median, not mean — the tail is long and a mean would describe nobody.",
+        period_is_an_as_of=True,
     )
 )
 

@@ -163,6 +163,22 @@ class MetricSpec:
     #: and for the three that did not move.
     note: str = ""
 
+    #: The period names a date to measure *at*, not a window to count *within*.
+    #:
+    #: Twenty of the twenty-one metrics are flows: they count what happened
+    #: between two dates, and both dates narrow the rows. Months Since Last
+    #: Training is a stock — it asks how stale a population is as at a moment —
+    #: and scoping it like a flow made it meaningless. Filtered to August it
+    #: reported 0.6 months, the median over the people who had trained in
+    #: August, who had by definition just trained. Its answer could never
+    #: exceed the window's own length.
+    #:
+    #: Declaring it here rather than inside the one metric is what keeps the
+    #: two consequences from drifting apart: `date_from` stops narrowing the
+    #: population, and the monthly trend stops asking the month in progress for
+    #: a date three weeks away. Both read this flag.
+    period_is_an_as_of: bool = False
+
     def reject_unsupported(self, filters: MetricFilters) -> None:
         unsupported = filters.dimensions_used - self.supports
         if unsupported:
