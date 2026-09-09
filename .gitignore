@@ -230,3 +230,19 @@ certs/
 # somebody's desktop — `docs/.~lock.L&D Main Reports.xlsx#` was committed that
 # way and removed in week 9.
 .~lock.*#
+
+# Playwright, from the week-10 accessibility pass. `test-results/` holds traces
+# for failures and `playwright-report/` the HTML report — both are regenerated
+# by every run, and a trace zip is a few megabytes of screenshots.
+web/test-results/
+web/playwright-report/
+web/a11y-results.json
+
+# Exports downloaded from the dashboard while testing. Four of these reached
+# the repository root in the week-10 branch, browser "(1)" duplicates included.
+# Every one of them is reproducible from /v1/exports in a second.
+/lnd-*.xlsx
+/lnd-*.csv
+/lnd-*.pdf
+/total_*.csv
+/backups/

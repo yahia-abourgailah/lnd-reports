@@ -388,8 +388,26 @@ def render(session: Session) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate docs/reconciliation.md")
     parser.add_argument("--check", action="store_true", help="compare, write nothing")
+    # Same flag, and the same reason, as the golden generator: this replays the
+    # frozen dataset, and a replay into a database that already holds facts
+    # doubles every grain. `replay` now refuses that outright, so without a
+    # scratch database to point at, the refusal would be the whole experience.
+    parser.add_argument(
+        "--database-url",
+        help="a scratch database to replay the frozen dataset into (defaults to DATABASE_URL)",
+    )
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    if args.database_url:
+        import os
+
+        from lnd.config import get_settings
+        from lnd.db import dispose_engine
+
+        os.environ["DATABASE_URL"] = args.database_url
+        get_settings.cache_clear()
+        dispose_engine()
 
     from lnd.db import session_scope
     from lnd.reference.replay import replay

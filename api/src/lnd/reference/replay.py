@@ -59,6 +59,42 @@ def _restore_survey_questions(session: Session, rows: list[dict[str, Any]]) -> N
     session.flush()
 
 
+class DatabaseNotEmpty(RuntimeError):
+    """Asked to replay into a database that already holds facts."""
+
+
+def _refuse_a_populated_database(session: Session) -> None:
+    """A replay is only ever correct into an empty `core`.
+
+    It lands the frozen payloads *in addition to* whatever is there, so pointed
+    at the dev database it doubles every grain — 1,060 enrollments become 2,120.
+    This has now happened twice. The first time the `--database-url` flag on the
+    golden generator was accepted and ignored, and the golden file came within
+    an ordering accident of recording the doubled figures as the values nothing
+    may move from. The second was `python -m lnd.reference.reconcile` run inside
+    the api container, where DATABASE_URL is the live dev database.
+
+    Both times the transform invariant caught it, and both times that was the
+    last line of defence rather than the first. This is the first: it refuses
+    before anything is landed, and it says which database and what to do.
+
+    Callers that legitimately replay — the golden generator, the perf harness,
+    the test fixtures — all work against an empty or truncated `core` already.
+    """
+    from sqlalchemy import func
+
+    from lnd.models.core import FactAttendance
+
+    existing = session.scalar(select(func.count()).select_from(FactAttendance)) or 0
+    if existing:
+        raise DatabaseNotEmpty(
+            f"core already holds {existing:,} attendance rows. Replaying would land the "
+            "frozen dataset on top of them and double every grain. Point this at a "
+            "scratch database — `--database-url postgresql+psycopg://…/lnd_scratch` — "
+            "or truncate core first."
+        )
+
+
 def replay(session: Session, dataset: dict[str, Any] | None = None) -> TransformResult:
     """Land the frozen dataset and transform it. Returns what the pass did.
 
@@ -69,6 +105,7 @@ def replay(session: Session, dataset: dict[str, Any] | None = None) -> Transform
     published, and every coverage figure here would be pinned at the wrong
     value.
     """
+    _refuse_a_populated_database(session)
     data = dataset if dataset is not None else load_dataset()
 
     land(

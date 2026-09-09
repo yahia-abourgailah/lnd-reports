@@ -131,7 +131,17 @@ export function GroupedBars({
           </li>
         ))}
       </ul>
-      <div className="grouped-plot" role="img" aria-label={caption ?? 'By month'}>
+      {/* Focusable, because it scrolls. A region a mouse can pan and a keyboard
+          cannot reach is content nobody navigating by keyboard can see — the
+          accessibility pass called it, and it was right: fifteen months do not
+          fit in a third of the board. `role="group"` rather than `img`, since
+          the bars inside carry their own titles. */}
+      <div
+        className="grouped-plot"
+        role="group"
+        tabIndex={0}
+        aria-label={caption ?? 'By month'}
+      >
         {groups.map((group, index) => (
           <div className="grouped-col" key={group.label + (group.year ?? '')}>
             <div className="grouped-bars">

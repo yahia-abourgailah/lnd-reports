@@ -16,7 +16,13 @@
   --surface-2: #eaeef0;
   --ink: #12181a;
   --ink-2: #475357;
-  --ink-3: #77858a;
+  /* Darkened in week 10 from #77858a, which failed WCAG AA on all three
+     surfaces — 3.81:1 on white, 3.48 on the ground, 3.26 on surface-2 against
+     a 4.5 floor. It is the colour every secondary line uses: the sample size
+     under a figure, the note under an enrichment row, the definition text. One
+     token accounted for 150 of the 153 violations found, which is the shape a
+     design-system failure has. This clears 4.5:1 on the darkest of the three. */
+  --ink-3: #586469;
   --rule: #dbe1e4;
   --rule-soft: #eceff1;
 
@@ -30,11 +36,14 @@
   --brand-rule: #2c5b85;
   --brand-ink: #ffffff;
   --brand-ink-2: #c9d2db;
-  /* 3.60:1 on navy — AA for the large figures it is used on, and nothing
-     else. `--figure-soft` is the step that clears 4.5:1 where orange has to
-     carry body-size text. */
-  --figure: #e97132;
-  --figure-soft: #f58b4c;
+  /* Two oranges, and the accessibility pass is why there are two.
+     `--figure-mark` is the workbook's own #E97132 and reads 3.60:1 on the navy
+     — fine for a chart bar, which needs 3:1, and not for text at any size the
+     strip actually renders. The strip value shrinks with the viewport, so it is
+     never reliably "large text" and axe was right to fail it. `--figure` is the
+     step that clears 4.5:1 and is what every figure on screen now uses. */
+  --figure: #f58b4c;
+  --figure-mark: #e97132;
 
   /* Interactive. Shifted into the workbook's blue family so it sits with the
      masthead rather than against it; still not the semantic set, and still not
@@ -73,7 +82,12 @@
  * render dark inside a light page.
  *
  * The navy is the brand, not a theme. It is the masthead and the figures, and
- * it is the same navy in every condition. */
+ * it is the same navy in every condition.
+ *
+ * Week 10 corrected `--ink-3` on both sides of the old switch. Only the light
+ * correction survives, and it is the one that mattered: #77858a failed AA on
+ * all three surfaces and accounted for 150 of the 153 violations the
+ * accessibility pass found. The dark values went with the dark theme. */
 
 * { box-sizing: border-box; }
 
@@ -187,7 +201,12 @@ body {
   white-space: nowrap;
 }
 .badge-dot { width: 7px; height: 7px; border-radius: 50%; background: currentcolor; }
-.badge-lag { font: 400 11.5px/1 var(--mono); opacity: 0.75; }
+/* No `opacity` here. It read as a quieter version of the badge's own colour and
+   is in fact a different colour — 0.75 took the freshness lag from 5.4:1 to
+   3.43:1 against the badge ground, so the one element on screen whose job is to
+   say the data might be stale was the least legible thing on it. Weight and
+   size carry the hierarchy instead. */
+.badge-lag { font: 400 11.5px/1 var(--mono); }
 .badge-ok   { background: var(--ok-soft);   color: var(--ok); }
 .badge-warn { background: var(--warn-soft); color: var(--warn); }
 .badge-bad  { background: var(--bad-soft);  color: var(--bad); }
@@ -469,7 +488,11 @@ button.kpi-value:disabled { color: var(--ink-3); font-weight: 400; cursor: defau
 .exclusion-clear { background: var(--ok-soft); color: var(--ok); }
 /* The flagged count sits inside the banner but must not read as part of the
    headline claim — it is context, not a loss. */
-.exclusion-aside { opacity: 0.82; }
+/* Opacity again, and the same lesson as `.badge-lag`: 0.82 turned the ok green
+   into a colour nobody chose, at 3.92:1. The aside is the sentence explaining
+   that flagged records are not excluded ones — the distinction the banner got
+   wrong in week 6 — so it is not a detail to fade. */
+.exclusion-aside { font-weight: 400; }
 .exclusion-some { background: var(--warn-soft); color: var(--warn); }
 
 /* ------------------------------------------------------------- the drawer */
@@ -523,7 +546,11 @@ button.kpi-value:disabled { color: var(--ink-3); font-weight: 400; cursor: defau
   padding: 0 22px 8px; font-size: 12.5px; color: var(--ink-2);
 }
 .grid-count { font-variant-numeric: tabular-nums; }
-.grid-head, .grid-row {
+/* The columns are laid out on the header *row*, not on the rowgroup that wraps
+   it: the rowgroup exists so the ARIA tree is a table, and giving it a grid
+   display as well would put the row and the group in competition for the same
+   track sizing. */
+.grid-headrow, .grid-row {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
@@ -543,7 +570,11 @@ button.kpi-value:disabled { color: var(--ink-3); font-weight: 400; cursor: defau
 }
 .grid-th:hover { color: var(--ink); }
 .grid-sorted { color: var(--accent); }
+/* Focusable, so it needs to show that it is. Outline inside the box: an
+   outline on a scroll container clips against its own overflow and a keyboard
+   user gets three visible edges out of four. */
 .grid-body { overflow: auto; }
+.grid-body:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .grid-row {
   height: 33px; align-items: center;
   border-bottom: 1px solid var(--rule-soft);
@@ -642,7 +673,18 @@ button.kpi-value:disabled { color: var(--ink-3); font-weight: 400; cursor: defau
   background: var(--surface-2);
 }
 .table tr:last-child td { border-bottom: 0; }
-.table a { color: var(--accent); text-decoration: none; }
+/* Underlined, not merely coloured. A link that sits beside plain text in the
+   same cell — a trainer's name next to the marks saying they are a placeholder
+   or an outside vendor — is distinguished from that text by 2.42:1 of colour
+   alone, which anybody who does not see the hue reads as one run of words.
+   Faint, so a column of them still scans as a column. */
+.table a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  text-underline-offset: 2px;
+}
+.table a:hover { text-decoration-color: currentcolor; }
 .table a:hover { text-decoration: underline; }
 
 .card-head { margin: 4px 0 18px; }
@@ -1062,9 +1104,12 @@ td.num, .ranked td.num {
 /* The freshness badge sits in the masthead, so its three states need to read on
    navy rather than on the light ground they were mixed for. Same three
    meanings, restated against this surface. */
-.chrome .badge-ok { background: rgb(146 208 80 / 16%); color: var(--series); }
-.chrome .badge-warn { background: rgb(233 113 50 / 18%); color: var(--figure-soft); }
-.chrome .badge-bad { background: rgb(224 126 102 / 20%); color: #f0a08e; }
+/* 10%, not 16%: the tint lightens the ground toward the very colour written
+   on it, so more of it is less contrast. At 16% green on #2a5561 read 4.42:1
+   and failed by a hair; at 10% the ground is #224d62 and it reads 4.93. */
+.chrome .badge-ok { background: rgb(146 208 80 / 10%); color: var(--series); }
+.chrome .badge-warn { background: rgb(233 113 50 / 10%); color: var(--figure); }
+.chrome .badge-bad { background: rgb(224 126 102 / 12%); color: #f4a894; }
 .chrome .badge-lag { color: var(--brand-ink-2); }
 
 /* --------------------------------------------------------------- the figures */
@@ -1100,7 +1145,7 @@ button.kpi-value:disabled,
 .spark-value { color: var(--brand-ink); }
 /* A flagged sample is still a warning, and orange is the figure colour here —
    so it says so in green's absence with the softer orange plus a rule. */
-.kpi-flag { color: var(--figure-soft); }
+.kpi-flag { color: var(--figure); }
 
 .kpi-info {
   border-color: var(--brand-rule);
@@ -1111,15 +1156,23 @@ button.kpi-value:disabled,
 
 /* Provenance chips, restated for navy. The meanings are unchanged: corrected is
    the one that cost a published figure, restated is a definition that now says
-   what it counts, new never existed before. */
+   what it counts, new never existed before.
+
+   One tint for all three, at 12%. At 20% these were 4.54, 4.46 and 3.00 — one
+   passing, one failing by four hundredths and one failing outright, which is
+   what happens when a tint is chosen by eye against a colour it is also
+   lightening. The blue is a lighter step for the same reason: `--series-2` is
+   a mark colour, sized for a 3:1 threshold, and this is 10.5px text.
+
+   Measured, not judged: 5.00, 5.05 and 4.54 against their own grounds. */
 .kpi .tag-corrected,
-.figure .tag-corrected { background: rgb(224 126 102 / 20%); color: #f4a894; }
+.figure .tag-corrected { background: rgb(224 126 102 / 12%); color: #f4a894; }
 .kpi .tag-restated,
 .kpi .tag-renamed,
 .figure .tag-restated,
-.figure .tag-renamed { background: rgb(200 150 196 / 20%); color: #dcb4d9; }
+.figure .tag-renamed { background: rgb(200 150 196 / 12%); color: #dcb4d9; }
 .kpi .tag-new,
-.figure .tag-new { background: rgb(77 163 232 / 20%); color: var(--series-2); }
+.figure .tag-new { background: rgb(77 163 232 / 12%); color: #7bbdf0; }
 
 /* The definition popover hangs off the bottom of a navy card, so it belongs to
    the card rather than to the page behind it. */
@@ -1290,7 +1343,7 @@ button.kpi-value:disabled,
 .key-swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; }
 .key-a { background: var(--series); }
 .key-b { background: var(--series-2); }
-.key-c { background: var(--figure); }
+.key-c { background: var(--figure-mark); }
 
 /* ------------------------------------------------------------------- donut */
 .donut { display: flex; align-items: center; gap: 18px; }
@@ -1326,7 +1379,7 @@ button.kpi-value:disabled,
   font-variant-numeric: tabular-nums;
 }
 .gbar-a { background: var(--series); }
-.gbar-b { background: var(--figure); }
+.gbar-b { background: var(--figure-mark); }
 .gbar-c { background: var(--series-2); }
 .grouped-label {
   font: 400 10.5px/1 var(--mono);
@@ -1440,7 +1493,14 @@ button.kpi-value:disabled,
 .tab-count {
   margin-left: 7px;
   font: 600 10.5px/1 var(--mono);
-  background: var(--figure); color: var(--brand);
+  background: var(--figure-mark); color: var(--brand);
   border-radius: 999px; padding: 2px 6px;
   vertical-align: 1px;
+}
+
+/* The scrollable chart takes focus, so it must show it. */
+.grouped-plot:focus-visible {
+  outline: 2px solid var(--series);
+  outline-offset: 2px;
+  border-radius: 3px;
 }

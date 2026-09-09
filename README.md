@@ -34,6 +34,7 @@ start.
 make logs S=api      # tail one service
 make check           # everything CI runs on the API
 make web-check       # typecheck and build the front end
+make evidence        # regenerate the week-10 evidence documents
 make psql            # a shell on the database
 make down            # stop;  make nuke  also drops the volumes
 ```
@@ -425,10 +426,58 @@ mail does not arrive.
 Procedures are in [`docs/runbooks.md`](docs/runbooks.md), each one rehearsed
 against the dev stack with its real output quoted.
 
+## The week-10 evidence
+
+Five documents, each generated from the running system rather than written, and
+each able to **fail**. A launch gate whose evidence cannot come back negative is
+a formality.
+
+```bash
+make parallel-run        # the live platform against the workbook
+make security-review     # what we store, what we refuse, what we cannot do
+make perf                # p95 at the BRD's 15,000-record ceiling
+make restore-rehearsal   # back up, restore elsewhere, prove it is the same platform
+make evidence            # the three that need no scratch database
+cd web && npm run a11y   # WCAG 2.1 AA, every screen, against the real application
+```
+
+| Document | Says | Fails when |
+|---|---|---|
+| [`parallel-run.md`](docs/parallel-run.md) | Every metric three ways: workbook, signed reference, live | A difference has no written cause |
+| [`report-comparison.md`](docs/report-comparison.md) | The generated report against the manual one, cell for cell | A figure is not in the cell its label claims |
+| [`security-review.md`](docs/security-review.md) | Stored fields, refused fields, grants, write verbs | Anything forbidden is stored, or `raw` is writable |
+| [`performance.md`](docs/performance.md) | Every view at p95 against 15,145 attendance rows | A view exceeds 2s cold, or does not return 200 |
+| [`restore-rehearsal.md`](docs/restore-rehearsal.md) | A dump restored elsewhere: grains, grants, figures | A grain, a grant or a figure did not survive |
+
+What they found, in order of how much it mattered:
+
+- **The nightly `pg_dump` was a comment.** WAL archiving was configured and the
+  base backup it recovers *from* did not exist. `scripts/backup.sh` is the
+  missing half, and the restore is now rehearsed — including the check that
+  matters most, which is that `raw` comes back append-only. Roles live in the
+  cluster, not the dump.
+- **153 accessibility violations, 150 of them one palette token.** `--ink-3` at
+  3.26:1 against the surface it sits on, in every secondary line in the
+  application. Two `opacity` rules did the rest. Now zero of any impact, with
+  axe-core in CI.
+- **The signed reconciliation is stale.** Participation Rate reads 9.2% live
+  against 9.3% frozen, because the roster moved. Small, and it is the kind of
+  small that costs a meeting if somebody opens the dashboard during it. See
+  [`cutover.md`](docs/cutover.md) for the two ways to settle it.
+- **A replay could still be pointed at a populated database.** It has happened
+  twice, and both times the transform invariant was the last line of defence
+  rather than the first. `replay()` now refuses before landing anything.
+
+For people rather than for CI: [`user-guide.md`](docs/user-guide.md),
+[`uat.md`](docs/uat.md) — three roles, and only one of them ever signs in — and
+[`cutover.md`](docs/cutover.md).
+
 ## Where it stands
 
-Weeks 1–9 are built and verified against the live CRM. What remains before an
-L&D specialist can use this unaided:
+Weeks 1–10 are built and verified against the live CRM; the walkthrough,
+sign-off and the retirement itself are the remaining acts, and they are
+conversations rather than commits. What blocks an L&D specialist using this
+unaided:
 
 - **The Microsoft Entra app registration.** Three blank settings, and the API
   refuses to start outside dev without them. The client itself is proven: the
@@ -443,8 +492,12 @@ L&D specialist can use this unaided:
   `python -m lnd.delivery.preflight` answers "will this work" in ten seconds the
   moment credentials arrive — rather than on the first of the month.
 - **The L&D walkthrough.** Every figure computes and every difference has a
-  written reason; nobody outside the team has seen 9.3% yet, and the plan is
-  explicit that it should not arrive alongside a dashboard.
+  written reason — now provably, since the parallel run fails on one that does
+  not. Nobody outside the team has seen 9.2% yet, and the plan is explicit that
+  it should not arrive alongside a dashboard.
+- **HR's signature** on the security review, and the question in it that is
+  genuinely open: there is no erasure path for a named individual, because `raw`
+  is append-only by design. That should be raised rather than ticked.
 - **Two answers from the CRM team.** A trainer `employee_code`, so 16 spellings
   stop needing an alias table; and `sector` still arrives with a trailing space
   on 948 of 1,060 rows in the programs payload, though `get_users` is now clean.

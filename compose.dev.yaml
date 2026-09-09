@@ -30,6 +30,20 @@ services:
     volumes:
       - ./api/src:/srv/src:ro
       - ./api/alembic:/srv/alembic:ro
+      # The frozen reference dataset and its golden figures live in the
+      # repository rather than in the image — the Dockerfile copies `src` and
+      # `alembic` and nothing else — so the generators that replay it need this
+      # mount or they run happily against nothing.
+      #
+      # Dev only. The runtime never reads it: nothing under `lnd.api` or
+      # `lnd.worker` touches `tests`, so staging and production have no mount.
+      #
+      # `./docs:/docs` is deliberately absent. It was here so the generators
+      # could write their documents, and it could not work: the container is
+      # uid 10001 and the repository is not, so every write was refused. They
+      # print to stdout now and the scripts redirect on the host, where the
+      # file ends up owned by whoever ran them.
+      - ./api/tests:/srv/tests
     environment:
       PYTHONPATH: /srv/src
 

@@ -329,9 +329,65 @@ then point `OIDC_DISCOVERY_URL` at
 
 ---
 
+## 7. Restoring from backup
+
+Rehearsed for real on 9 September 2026, and the output is in
+[`restore-rehearsal.md`](restore-rehearsal.md). What it found first is worth
+knowing: the nightly `pg_dump` was a comment in `compose.prod.yaml` and nothing
+took one. WAL archiving was configured and the base backup it recovers *from*
+was not — recovery that looks provisioned with no starting point.
+
+```bash
+scripts/backup.sh                                   # one dump, verified, pruned at 30 days
+scripts/restore.sh backups/dumps/<file> lnd_restore # into a scratch name, never over the live one
+scripts/restore-rehearsal.sh                        # all three steps, and the proof
+```
+
+Real output, dev stack, 1,544 raw versions:
+
+```
+✓ ./backups/dumps/lnd-20260909T104217Z.dump (596 KB, listing verified)
+✓ restored into lnd_restore
+restore verified: 10 grains, 21 figures, raw still append-only
+```
+
+Backup, restore and verification together: 7 seconds. Read that as a lower
+bound — a local dump over a loopback socket. The shape is what was proven.
+
+Three things are checked after the restore, and the second is the one that
+would have been missed. Every grain matches the source; **`raw` is still
+append-only for `lnd_app_rw`**, because roles live in the cluster and not in
+the dump, so a restore into a fresh cluster can succeed completely and arrive
+with every grant pointing at a role that does not exist; and every published
+figure is recomputed out of the restored database by the same registry the
+dashboard reads, because row counts can match while a figure moves.
+
+`restore.sh` refuses the live database name outright and there is no flag to
+override it. Restoring over a running database is something somebody does
+deliberately, with the stack stopped, by renaming — not something a script
+offers as a convenience at three in the morning.
+
+### Scheduling it
+
+The dump is a host cron entry, not a container. The API image carries no
+Postgres client tools, and giving the application a shell that can `pg_dump`
+would be a larger privilege than the backup is worth:
+
+```cron
+15 2 * * *  cd /srv/lnd && COMPOSE="-f compose.yaml -f compose.prod.yaml" scripts/backup.sh >> /var/log/lnd-backup.log 2>&1
+```
+
+---
+
 ## Not yet rehearsed
 
-**Restore from backup.** Nightly `pg_dump -Fc` plus WAL archiving is configured;
-restoring it for real is week 10 and is on the plan as an explicit exit
-criterion. Configured is not proven, and this section will not claim otherwise
-until somebody has done it and pasted the output here.
+**Point-in-time recovery.** WAL archiving is configured and the rehearsal above
+restores a base dump only. Replaying WAL forward to a chosen moment is a
+different procedure with a different failure mode, and claiming it works
+because a dump restored would be the mistake the section above was written to
+end.
+
+**A fresh cluster.** The restore went into a database on a cluster that already
+had the roles. `scripts/restore.sh` checks for them and stops with the remedy
+rather than restoring a database whose access control did not survive — but the
+disaster case, new host and empty cluster, has not been walked end to end.
