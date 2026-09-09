@@ -77,6 +77,32 @@ PROGRAM_DIMENSIONS = frozenset(
 )
 
 
+def _population_is_estimated(
+    session: Session, spec: MetricSpec, filters: MetricFilters
+) -> bool:
+    """Whether this metric rests on employee rows the platform had to assume.
+
+    Derived from the metric's declared population rather than remembered by each
+    metric, because it was forgotten once already: Participation Rate returned
+    the flag and Coverage Gap — the same headcount, minus attendance — returned
+    nothing, so a figure resting on assumed employment presented itself as
+    exact.
+
+    The assumption is real and unavoidable. The CRM gives no hire date, so
+    somebody it first showed us in September is recorded as valid from before
+    the platform existed and counts in August's headcount. `is_estimated` is how
+    a reader is told that, and any metric over this population owes it.
+    """
+    if spec.population is not pop.ENROLLABLE_EMPLOYEES:
+        return False
+    eligible = scope.enrollable_employees(filters.without(Dimension.PERIOD)).subquery()
+    return bool(
+        session.scalar(
+            select(func.count()).select_from(eligible).where(eligible.c.is_estimated)
+        )
+    )
+
+
 def _value(
     spec: MetricSpec,
     filters: MetricFilters,
@@ -117,7 +143,13 @@ class ScalarMetric:
     def compute(self, session: Session, filters: MetricFilters) -> MetricValue:
         self.spec.reject_unsupported(filters)
         total, rows = self._measure(session, filters)
-        return _value(self.spec, filters, value=total, sample_size=rows)
+        return _value(
+            self.spec,
+            filters,
+            value=total,
+            sample_size=rows,
+            is_estimated=_population_is_estimated(session, self.spec, filters),
+        )
 
     def _measure(
         self, session: Session, filters: MetricFilters

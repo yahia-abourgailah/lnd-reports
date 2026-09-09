@@ -223,3 +223,50 @@ class TestFiltersAreHonoured:
 
         assert "participation_rate" not in keys
         assert "training_days" in keys
+
+
+class TestEstimatedTravelsWithThePopulation:
+    """A figure resting on assumed employment must say so — every one of them.
+
+    The CRM gives no hire date, so somebody it first shows us in September is
+    recorded as valid from before the platform existed and counts in August's
+    headcount. That is unavoidable and it is why `is_estimated` exists.
+
+    It was carried by Participation Rate and dropped by Coverage Gap, which is
+    the same headcount minus attendance, so one of the two presented an assumed
+    figure as an exact one. The flag now comes from the declared population
+    rather than from each metric remembering, and this asserts that it cannot be
+    dropped again.
+    """
+
+    def test_every_metric_over_the_roster_reports_it(self, loaded: Session) -> None:
+        from lnd.metrics import population as pop
+        from lnd.metrics import registry
+
+        over_roster = [
+            metric
+            for metric in registry.METRICS
+            if metric.spec.population is pop.ENROLLABLE_EMPLOYEES
+        ]
+        assert over_roster, "no metric uses the roster population any more"
+
+        flags = {
+            metric.spec.key: registry.compute(metric.spec.key, loaded, MetricFilters()).is_estimated
+            for metric in over_roster
+        }
+        assert len(set(flags.values())) == 1, (
+            f"metrics over one population disagree about whether it is estimated: {flags}"
+        )
+
+    def test_metrics_over_other_populations_do_not_claim_it(self, loaded: Session) -> None:
+        """The flag means something specific. A count of sessions cannot be
+        estimated, and saying so would make the word worthless where it is
+        true."""
+        from lnd.metrics import population as pop
+        from lnd.metrics import registry
+
+        for metric in registry.METRICS:
+            if metric.spec.population is pop.ENROLLABLE_EMPLOYEES:
+                continue
+            value = registry.compute(metric.spec.key, loaded, MetricFilters())
+            assert value.is_estimated is False, metric.spec.key
