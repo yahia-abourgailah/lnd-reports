@@ -158,6 +158,19 @@ def _section(provenance: Provenance, values: dict[str, MetricValue]) -> list[str
     return [*lines, ""]
 
 
+#: Titles, because `blocked` is a list of titles. Kept beside the paragraph each
+#: one triggers so a renamed metric fails the test rather than silently dropping
+#: its explanation.
+_SURVEY_TITLES = (
+    "Knowledge Relevance",
+    "Activity Effectiveness",
+    "Logistics Effectiveness",
+    "Facilitator Performance",
+    "Net Promoter Score",
+)
+_LINKEDIN_TITLES = ("LinkedIn Hours", "Blended Learner Hours", "Unique Reach")
+
+
 def _care(values: dict[str, MetricValue]) -> list[str]:
     """The two figures that will be misread, and the one that surprised us.
 
@@ -311,18 +324,31 @@ def render(session: Session) -> str:
             "",
             *(f"- **{title}**" for title in blocked),
             "",
-            "The five quality metrics and NPS are blocked on one thing: "
-            "`app.survey_question_map` is empty, so no answer can be attributed to a "
-            "measured dimension. All survey responses are stored; none are scored. "
-            "The CRM runs a single shared survey whose questions are stable across "
-            "every program — q3 knowledge, q4 activity, q5 logistics, q6 facilitator, "
-            "q7 recommend — so the map is five rows, and until it exists the "
-            "stakeholder gate cannot be held on the figures L&D most wants to see.",
-            "",
-            "LinkedIn Hours, Blended Learner Hours and Unique Reach have no source "
-            "connected. They are scheduled for weeks 7-8 and are first to be cut.",
-            "",
         ]
+        # Said per cause, not as one paragraph covering whatever happens to be
+        # blocked. The survey sentence was emitted unconditionally and stayed in
+        # the document after the question map was seeded and the quality scores
+        # started computing — a generated statement asserting a blockage that
+        # had been cleared, in the one document whose whole purpose is to be
+        # trusted in front of stakeholders.
+        if any(title in blocked for title in _SURVEY_TITLES):
+            lines += [
+                "The quality metrics and NPS are blocked on one thing: "
+                "`app.survey_question_map` has no row for the questions these "
+                "programmes ask, so no answer can be attributed to a measured "
+                "dimension. Every response is stored; none is scored. Until the map "
+                "exists the stakeholder gate cannot be held on the figures L&D most "
+                "wants to see.",
+                "",
+            ]
+        if any(title in blocked for title in _LINKEDIN_TITLES):
+            lines += [
+                "LinkedIn Hours, Blended Learner Hours and Unique Reach have no source "
+                "connected — the export's delivery mechanism and column set are still "
+                "open with L&D. They report no value rather than zero: there has been "
+                "no measurement, which is not a measurement of none.",
+                "",
+            ]
     else:
         lines += ["Nothing. Every metric produces a value.", ""]
 

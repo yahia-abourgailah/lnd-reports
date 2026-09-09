@@ -4,7 +4,7 @@
      every figure and every explanation comes from the metric registry, and a
      hand-edit would drift from the code it is supposed to describe. -->
 
-Generated 2026-09-07 from the metric registry against the frozen reference dataset.
+Generated 2026-09-09 from the metric registry against the frozen reference dataset.
 
 ## The rule this is written under
 
@@ -257,9 +257,7 @@ These metrics produce no value on the current data:
 - **LinkedIn Hours**
 - **Unique Reach**
 
-The five quality metrics and NPS are blocked on one thing: `app.survey_question_map` is empty, so no answer can be attributed to a measured dimension. All survey responses are stored; none are scored. The CRM runs a single shared survey whose questions are stable across every program — q3 knowledge, q4 activity, q5 logistics, q6 facilitator, q7 recommend — so the map is five rows, and until it exists the stakeholder gate cannot be held on the figures L&D most wants to see.
-
-LinkedIn Hours, Blended Learner Hours and Unique Reach have no source connected. They are scheduled for weeks 7-8 and are first to be cut.
+LinkedIn Hours, Blended Learner Hours and Unique Reach have no source connected — the export's delivery mechanism and column set are still open with L&D. They report no value rather than zero: there has been no measurement, which is not a measurement of none.
 
 ## The conversations that need care
 
