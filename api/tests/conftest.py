@@ -13,6 +13,7 @@ from lnd import db as lnd_db
 from lnd.config import get_settings
 from lnd.models import (
     AlertNotification,
+    DqException,
     ExportEdition,
     RawRecord,
     SavedView,
@@ -187,6 +188,7 @@ def live_db(db_engine: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[None
                 SourcePresence,
                 ExportEdition,
                 SavedView,
+                DqException,
             )
         }
         # Captured as plain dicts rather than ORM objects: these have to

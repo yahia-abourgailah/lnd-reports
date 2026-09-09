@@ -6,10 +6,12 @@ there is one place to read what the platform does unattended:
     every 30 minutes   pull every program, land what changed    (FR-A07)
     nightly            the same pull, plus deletion reconcile   (FR-A08)
     monthly            generate and email the L&D report       (FR-E05)
+    every 15 minutes   evaluate the alert rules and notify
 
-Each entry points at a stub that logs and returns, so beat is exercised end to
-end from day one rather than first switched on in week 9. The sync
-implementation is Person B's week-2 work and lives elsewhere.
+Nothing here is a stub any more. The schedule was wired end to end in week 1
+with tasks that logged and returned, so beat was exercised from the first day
+rather than first switched on the week it mattered; each has since been
+replaced by the real thing.
 """
 
 from __future__ import annotations
@@ -135,19 +137,50 @@ def transform_core() -> dict[str, int]:
 
 
 @celery_app.task(name="lnd.reports.monthly")
-def monthly_report() -> dict[str, str]:
-    """Week 9. Generate the monthly XLSX and email it, with no human step."""
-    log.info("monthly report (not yet implemented)", extra={"event": "reports.monthly.stub"})
-    return {"status": "not_implemented"}
+def monthly_report(year: int | None = None, month: int | None = None) -> dict[str, object]:
+    """Generate the monthly report, keep it, and send it (FR-E05).
+
+    In that order, and the order is the point: the edition is stored before any
+    attempt to send, so a relay that is down costs a delivery rather than a
+    report. The file stays downloadable and re-sendable holding the numbers as
+    they were on the first of the month — regenerating it later would give the
+    current answer for that month, which is a different document.
+
+    One transaction. A run that stored the workbook and then failed rendering
+    the PDF would leave a period half-published, and the next run would see an
+    edition already there and skip.
+
+    `year`/`month` default to the last complete month, which is what the
+    first-of-the-month schedule means. They exist so a period can be re-run by
+    hand from the worker after a relay outage.
+    """
+    from lnd.db import session_scope
+    from lnd.delivery import monthly as report
+
+    with session_scope() as session:
+        return report.run(session, year=year, month=month).as_dict()
+
+
+@celery_app.task(name="lnd.reports.resend")
+def resend_report(year: int, month: int) -> dict[str, object]:
+    """Send a period's stored editions again, without regenerating them.
+
+    Not on the schedule — this is the operator action after a relay outage, and
+    the runbook's one line. It exists as a task rather than as a script
+    somebody writes each time because the wrong instinct after a failed send is
+    to re-run the report, and that produces the *current* answer for that
+    month rather than the one that was published.
+    """
+    from lnd.db import session_scope
+    from lnd.delivery import monthly as report
+
+    with session_scope() as session:
+        return report.resend(session, year=year, month=month).as_dict()
 
 
 @celery_app.task(name="lnd.alerts.evaluate")
 def evaluate_alerts_task() -> dict[str, int]:
     """Detect problems and notify anything not already reported.
-
-    Unlike the sync tasks above this is not a stub: every rule is a query over
-    `sync_run`, so it does real work today and will keep doing it unchanged once
-    the sources are connected.
 
     One transaction for the whole evaluation. A failure part way through records
     nothing rather than half-claiming to have notified.

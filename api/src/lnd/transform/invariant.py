@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -216,5 +217,107 @@ def check_against_core(session: Session, expected: Offered) -> None:
             "enrollments": expected.enrollments,
             "attendance": expected.attendance,
             "evaluations": expected.evaluations,
+        },
+    )
+
+
+def check_no_silent_exclusion(session: Session) -> None:
+    """Every excluded record has an exception naming it (FR-F05).
+
+    The ledger above proves nothing was *lost*: what the payload offered, the
+    tables hold. This proves the second half, which is a different claim — that
+    nothing was quietly **withheld from a figure**. A row can be written, and
+    counted by the ledger, and still be missing from every breakdown because its
+    person did not resolve or its session has no duration. That is the
+    workbook's defect exactly: thirty-eight attendees present in the sheet and
+    absent from the sector report, with nothing anywhere saying so.
+
+    So for every rule whose disposition is QUARANTINED, the records it excludes
+    are counted from `core` — from the columns that record the exclusion, not
+    from the exception table — and compared against the open queue. Counting
+    both sides from the queue would be a tautology: the check would pass
+    whenever the transform forgot to raise, which is the failure it exists to
+    catch.
+
+    A mismatch raises, and the pass rolls back. `core` keeps its previous
+    coherent contents, and the dashboard keeps serving figures whose exclusions
+    are all accounted for.
+    """
+    from lnd.models.core import DimSession, IdentityStatus
+    from lnd.models.ops import DqException, DqRule, DqStatus
+
+    def open_for(rule: DqRule) -> int:
+        return int(
+            session.scalar(
+                select(func.count())
+                .select_from(DqException)
+                .where(DqException.rule == rule, DqException.status == DqStatus.OPEN)
+            )
+            or 0
+        )
+
+    def unresolved_in(model: type[Any]) -> int:
+        return int(
+            session.scalar(
+                select(func.count(func.distinct(model.employee_odoo_id))).where(
+                    model.identity_status == IdentityStatus.UNRESOLVED,
+                    model.deleted_at_source.is_(None),
+                )
+            )
+            or 0
+        )
+
+    failures: list[str] = []
+
+    # One exception per unresolvable identifier, not per row: the key names the
+    # person the platform cannot place, and the same person appearing on nine
+    # attendance rows is one thing to fix.
+    unresolved = len(
+        {
+            odoo_id
+            for model in (FactEnrollment, FactAttendance, FactEvaluation)
+            for odoo_id in session.scalars(
+                select(model.employee_odoo_id).where(
+                    model.identity_status == IdentityStatus.UNRESOLVED,
+                    model.deleted_at_source.is_(None),
+                )
+            ).all()
+        }
+    )
+    if unresolved and open_for(DqRule.IDENTITY_UNRESOLVED) < unresolved:
+        failures.append(
+            f"{unresolved} unresolved identities in core, "
+            f"{open_for(DqRule.IDENTITY_UNRESOLVED)} exceptions open"
+        )
+
+    underivable = int(
+        session.scalar(
+            select(func.count())
+            .select_from(DimSession)
+            .where(
+                DimSession.duration_derivable.is_(False),
+                DimSession.deleted_at_source.is_(None),
+            )
+        )
+        or 0
+    )
+    if underivable and open_for(DqRule.DURATION_UNDERIVABLE) < underivable:
+        failures.append(
+            f"{underivable} sessions with no derivable duration, "
+            f"{open_for(DqRule.DURATION_UNDERIVABLE)} exceptions open"
+        )
+
+    if failures:
+        raise InvariantViolation(
+            "records are excluded from figures with no exception registered; the "
+            "pass will not commit — " + "; ".join(failures)
+        )
+
+    log.info(
+        "no record is excluded without an exception",
+        extra={
+            "event": "transform.invariant.exclusions_accounted",
+            "unresolved_identities": unresolved,
+            "underivable_durations": underivable,
         },
     )

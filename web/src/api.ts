@@ -533,3 +533,122 @@ export const renameView = (id: number, name: string) =>
 
 export const deleteView = (id: number) =>
   api<void>(`/views/${id}`, { method: 'DELETE' })
+
+// ----------------------------------------------------------------- exceptions
+
+/** One data-quality rule, described. The same four sentences the API serves
+ *  everywhere a rule appears — meaning, cost, fix — so the console never
+ *  writes its own copy of an explanation the platform already owns. */
+export interface DqRuleInfo {
+  rule: string
+  title: string
+  means: string
+  costs: string
+  disposition: string
+  /** True where the records are missing from figures rather than flagged in
+   *  them. The distinction the exclusion banner got wrong for a week. */
+  costs_numbers: boolean
+  resolution: string
+  /** The enrichment overlay that fixes it, where one does. Null means the fix
+   *  is at source, or that the exception is a fact to accept. */
+  fixed_by: string | null
+  /** True where dismissal is the ordinary outcome, not a last resort. */
+  dismissal_is_normal: boolean
+}
+
+export interface DqException {
+  exception_key: string
+  rule: string
+  disposition: string
+  status: string
+  summary: string
+  details: Record<string, unknown> | null
+  crm_program_id: number | null
+  crm_session_id: number | null
+  employee_odoo_id: string | null
+  first_seen_at: string
+  last_seen_at: string
+  occurrences: number
+  age_days: number
+}
+
+export interface DqRuleGroup {
+  rule: DqRuleInfo
+  open_count: number
+  oldest_days: number
+  exceptions: DqException[]
+}
+
+export interface ExceptionsResponse extends Envelope {
+  groups: DqRuleGroup[]
+  total_open: number
+  excluded: number
+  flagged: number
+  unplaceable: number
+}
+
+export interface CompletenessPeriod {
+  period: string
+  excluded: number
+  flagged: number
+}
+
+export interface CompletenessResponse extends Envelope {
+  excluded: number
+  flagged: number
+  unplaceable: number
+  by_rule: { rule: DqRuleInfo; count: number }[]
+  months: CompletenessPeriod[]
+}
+
+export const getExceptions = (query = '') => api<ExceptionsResponse>(`/exceptions${query}`)
+
+export const getCompleteness = (query = '') =>
+  api<CompletenessResponse>(`/exceptions/completeness${query}`)
+
+export const dismissException = (key: string, reason: string) =>
+  api<DqException>(`/exceptions/${encodeURIComponent(key)}/dismiss`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  })
+
+// ------------------------------------------------------- enrichment forms
+
+/** One question an enrichment form asks, described by the server.
+ *
+ *  The screen renders from this rather than from a copy of the schema written
+ *  here. Two descriptions of one form is how a front end comes to offer a
+ *  field the write path refuses — and how a list of programmes goes stale
+ *  without anybody noticing until somebody cannot find one. */
+export interface FormOption {
+  value: string
+  label: string
+}
+
+export interface FormField {
+  name: string
+  label: string
+  input: 'text' | 'number' | 'select'
+  help: string
+  options: FormOption[]
+  placeholder: string
+  required: boolean
+}
+
+export interface OverlayForm {
+  kind: string
+  label: string
+  purpose: string
+  /** Which thing is being decided about. */
+  key: FormField[]
+  /** What is being decided. */
+  values: FormField[]
+  /** True where one value for many keys is the ordinary case — trainer
+   *  spellings, and nothing else. */
+  supports_bulk: boolean
+  fields_note: string
+  examples: string[]
+}
+
+export const getEnrichmentForms = () => api<OverlayForm[]>('/enrichment/forms')

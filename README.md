@@ -101,10 +101,14 @@ api/
     middleware.py       request id, access log, security headers
     auth/               OIDC + PKCE, signed session cookie
     api/v1/             health, auth, freshness, raw, kpis, drill, coverage,
-                        funnel, scorecards, learners, exports, enrichment, views
+                        funnel, scorecards, learners, exports, exceptions,
+                        enrichment, views
     analysis/           coverage, funnel, scorecards, learners — no arithmetic
                         of their own; every figure is the registry's
     export/             CSV, XLSX, PDF and the monthly report; retained editions
+    quality/            one description per data-quality rule; completeness
+                        per period, derived from the programme's own dates
+    delivery/           SMTP, and the scheduled job: generate, keep, then send
     models/             SQLAlchemy tables; the shared Source and Entity enums
     sources/crm/        HTTP client and typed models for the two CRM endpoints
     ingest/             payload hashing and the append-only landing of raw
@@ -116,13 +120,14 @@ api/
     alerts/             freshness and reconcile rules, with renotify suppression
     worker/             Celery app and the beat schedule
   tests/reference/      dataset.json.gz, golden.json — the CI gate reads these
-  alembic/versions/     0001 schemas → 0012 editions and saved views
+  alembic/versions/     0001 schemas → 0014 report delivery, alert kinds
 
 web/src/
   filters.ts            the global filter state, held in the URL
   components/           KPI cards, filter bar, freshness badge, drill drawer,
                         record grid, sparklines, coverage, funnel, scorecards,
-                        learners, export menu, saved views, reports, enrichment
+                        learners, export menu, saved views, reports, exceptions,
+                        enrichment
 
 .github/workflows/ci.yml
 ```
@@ -364,13 +369,73 @@ only runs in the container is one the test suite cannot assert. The fonts are
 vendored (`api/src/lnd/export/fonts/`) so a report renders identically in dev,
 in CI and in the image.
 
+## Counted or excepted, never neither
+
+The workbook's most dangerous behaviour was silent loss: thirty-eight attendees
+had no employee code, so the sector join dropped them, so they vanished from
+every sector breakdown — and nothing anywhere said so. The reports were not
+wrong in a way anyone could see.
+
+Eleven detection rules run after every transform. Each has **one** description —
+what it detects, what it costs, what fixes it — read by the transform that
+raises it, the API that serves the console, and the tests that hold the two
+together. Five are fixed by authoring an enrichment row, and `/exceptions` links
+to that form; the exception then closes **on the next transform**, because the
+rule is satisfied rather than because somebody ticked it off.
+
+Three invariants run before any pass may commit, and each raises rather than
+warns — a `core` that has lost rows must never be served:
+
+| Check | Catches |
+|-------|---------|
+| ledger | the payload offered more rows than the writer handled |
+| against core | an upsert overwrote instead of inserting |
+| no silent exclusion | something is missing from a figure with nothing in the queue to say so |
+
+The last is counted from `core`, never from the exception table. Counting both
+sides from the queue would be a tautology: the check would pass whenever the
+transform forgot to raise, which is the failure it exists to catch.
+
+## Unattended
+
+Five scheduled tasks, none of them a stub.
+
+| Task | When |
+|------|------|
+| `lnd.sync.incremental` | every 30 minutes |
+| `lnd.transform.core` | :05 and :35 — five minutes behind the sync, not chained to it |
+| `lnd.sync.full_reconcile` | 02:15 daily |
+| `lnd.reports.monthly` | 07:00 on the 1st |
+| `lnd.alerts.evaluate` | every 15 minutes |
+
+The monthly job **generates, keeps the edition, then sends** — in that order. A
+relay that is down costs a delivery rather than a report: the file stays in
+`/reports`, downloadable and re-sendable, holding the numbers as they were on
+the first of the month. `lnd.reports.resend` sends those stored bytes. Re-running
+the report to fix a failed send would produce the *current* answer for that
+month, which is a different document.
+
+With no `SMTP_HOST` the job still generates and still keeps the edition, and
+records "not sent" with the reason. A delivery that reported success because
+sending was switched off is the failure discovered in April by somebody asking
+why they never got March — so `report_undelivered` is a **critical** alert, and
+it is the only week-9 failure that is otherwise silent: no screen changes when a
+mail does not arrive.
+
+Procedures are in [`docs/runbooks.md`](docs/runbooks.md), each one rehearsed
+against the dev stack with its real output quoted.
+
 ## Where it stands
 
-Weeks 1–8 are built and verified against the live CRM. What remains before an
+Weeks 1–9 are built and verified against the live CRM. What remains before an
 L&D specialist can use this unaided:
 
 - **The Microsoft Entra app registration.** Three blank settings, and the API
   refuses to start outside dev without them. Nothing else blocks staging.
+- **An SMTP relay and a recipient list.** `SMTP_HOST` and `REPORT_RECIPIENTS`
+  are blank, so the monthly job generates and keeps its editions and sends
+  nothing. The path is tested end to end against a real SMTP conversation; what
+  is missing is a relay to point it at.
 - **The L&D walkthrough.** Every figure computes and every difference has a
   written reason; nobody outside the team has seen 9.3% yet, and the plan is
   explicit that it should not arrive alongside a dashboard.

@@ -262,26 +262,21 @@ class Completeness:
     flagged: int
 
 
-def completeness(session: Session) -> Completeness:
-    """The open queue, split by what it did to the numbers (FR-A05, FR-F04)."""
-    from lnd.models.ops import DqDisposition, DqException, DqStatus
+def completeness(session: Session, filters: MetricFilters | None = None) -> Completeness:
+    """The open queue, split by what it did to the numbers (FR-A05, FR-F04).
 
-    def count(disposition: DqDisposition) -> int:
-        return int(
-            session.scalar(
-                select(func.count())
-                .select_from(DqException)
-                .where(
-                    DqException.status == DqStatus.OPEN,
-                    DqException.disposition == disposition,
-                )
-            )
-            or 0
-        )
+    Delegates to `lnd.quality.completeness`, which is where the rule lives now
+    that the exception console needs the same figure broken down by rule and
+    by month. Two implementations of "how many records are excluded" would let
+    the banner on a screen disagree with the console explaining it.
 
-    return Completeness(
-        excluded=count(DqDisposition.QUARANTINED), flagged=count(DqDisposition.COUNTED)
-    )
+    Kept as a function here because every envelope in the API calls it, and the
+    envelope should not have to know which package owns the answer.
+    """
+    from lnd.quality import completeness as quality
+
+    scoped = quality.completeness(session, filters)
+    return Completeness(excluded=scoped.excluded, flagged=scoped.flagged)
 
 
 __all__ = ["Breakdown", "Completeness", "Slice", "Trend", "breakdown", "completeness", "trend"]

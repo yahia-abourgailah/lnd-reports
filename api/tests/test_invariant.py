@@ -337,3 +337,59 @@ class TestAttendeeOutsideRoster:
 
         assert DqRule.ATTENDEE_OUTSIDE_ROSTER not in open_rules(core_db)
         assert core_db.scalar(select(func.count()).select_from(DimProgram)) == 1
+
+
+class TestNoRecordIsExcludedSilently:
+    """Week 9's invariant, and the one that closes the workbook's worst defect.
+
+    The ledger proves nothing was lost: what the payload offered, the tables
+    hold. This proves the second half — that nothing was quietly withheld from a
+    *figure*. A row can be written, counted by the ledger, and still missing
+    from every breakdown because its person did not resolve or its session has
+    no duration. Thirty-eight attendees were present in the workbook and absent
+    from its sector report, and nothing anywhere said so.
+    """
+
+    def test_it_holds_on_transformed_data(self, loaded: Session) -> None:
+        from lnd.transform.invariant import check_no_silent_exclusion
+
+        check_no_silent_exclusion(loaded)
+
+    def test_an_unaccounted_exclusion_refuses_the_pass(self, loaded: Session) -> None:
+        """Counted from `core`, not from the queue.
+
+        Counting both sides from the exception table would be a tautology: the
+        check would pass whenever the transform forgot to raise, which is
+        precisely the failure it exists to catch.
+        """
+        from sqlalchemy import update
+
+        from lnd.models.core import DimSession
+        from lnd.transform.invariant import InvariantViolation, check_no_silent_exclusion
+
+        session_id = loaded.scalar(select(DimSession.crm_session_id).limit(1))
+        loaded.execute(
+            update(DimSession)
+            .where(DimSession.crm_session_id == session_id)
+            .values(duration_hours=None, duration_derivable=False)
+        )
+        loaded.flush()
+
+        with pytest.raises(InvariantViolation, match="no exception registered"):
+            check_no_silent_exclusion(loaded)
+
+    def test_the_message_names_the_shortfall(self, loaded: Session) -> None:
+        """A violation an operator cannot act on is a violation they will
+        restart the worker over."""
+        from sqlalchemy import update
+
+        from lnd.models.core import DimSession
+        from lnd.transform.invariant import InvariantViolation, check_no_silent_exclusion
+
+        loaded.execute(update(DimSession).values(duration_hours=None, duration_derivable=False))
+        loaded.flush()
+
+        with pytest.raises(InvariantViolation) as caught:
+            check_no_silent_exclusion(loaded)
+        assert "sessions with no derivable duration" in str(caught.value)
+        assert "0 exceptions open" in str(caught.value)

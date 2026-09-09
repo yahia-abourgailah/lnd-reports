@@ -45,35 +45,15 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from lnd.models.ops import DqDisposition, DqException, DqRule, DqStatus
+from lnd.models.ops import DqException, DqRule, DqStatus
+from lnd.quality import catalogue
 
 log = logging.getLogger(__name__)
 
-#: Which rules actually cost numbers, from BRD section 13. The two dispositions
-#: are not a severity ranking — they are the difference between "this record is
-#: missing from a figure" and "this record is in the figure and something about
-#: it is worth knowing". FR-D12 counts the first; FR-F04's completeness
-#: indicator measures it. Treating CAPACITY_EXCEEDED as a loss would understate
-#: the platform's coverage for a program that reported perfectly well.
-DISPOSITIONS: dict[DqRule, DqDisposition] = {
-    DqRule.IDENTITY_UNRESOLVED: DqDisposition.QUARANTINED,
-    DqRule.DURATION_UNDERIVABLE: DqDisposition.QUARANTINED,
-    DqRule.DUPLICATE_ATTENDANCE: DqDisposition.QUARANTINED,
-    DqRule.SURVEY_QUESTION_UNMAPPED: DqDisposition.QUARANTINED,
-    DqRule.SURVEY_OPTION_UNSCORED: DqDisposition.QUARANTINED,
-    # Counted, per the BRD's handling column: the record is in the totals and
-    # is only excluded from the one breakdown it cannot support.
-    DqRule.TRAINER_MISSING: DqDisposition.COUNTED,
-    DqRule.CUSTOMISED_DEPT_MISSING: DqDisposition.COUNTED,
-    DqRule.ATTENDANCE_NO_ENROLLMENT: DqDisposition.COUNTED,
-    DqRule.EVALUATION_NO_ATTENDANCE: DqDisposition.COUNTED,
-    DqRule.CAPACITY_EXCEEDED: DqDisposition.COUNTED,
-    # Their attendance is in the totals and in Learner Hours; only the
-    # breakdowns that need a `user` object lose them. Marking it QUARANTINED
-    # would tell the completeness indicator that an attendance row went
-    # missing, and none did.
-    DqRule.ATTENDEE_OUTSIDE_ROSTER: DqDisposition.COUNTED,
-}
+# Read from the catalogue rather than declared here. Two lists of "which rules
+# cost numbers" is how one of them comes to disagree with the exclusion banner —
+# which reported three flagged records as three excluded ones for a week.
+DISPOSITIONS = catalogue.DISPOSITIONS
 
 
 @dataclass

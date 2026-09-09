@@ -88,6 +88,11 @@ class Settings(BaseSettings):
     alert_reconcile_delete_threshold: int = 25
     # How far back a reconcile counts as current news.
     alert_reconcile_window_seconds: int = 86400
+    # How long a record may be excluded from figures before somebody is told
+    # rather than left to notice. Seven days: long enough that a fix authored
+    # the same afternoon never raises an alert, short enough that nothing sits
+    # out of the numbers for a whole reporting cycle unremarked.
+    alert_exclusion_age_seconds: int = 7 * 86400
 
     # -- calendar -----------------------------------------------------------
     # The month the company's fiscal year starts in. Finance confirmed
@@ -149,6 +154,30 @@ class Settings(BaseSettings):
     #: employee payloads into the repository.
     source_record_fixtures: bool = False
 
+    # -- report delivery ----------------------------------------------------
+    # SMTP is off until a host is configured, and that is the switch rather
+    # than an environment check: staging must be able to send to a mailbox
+    # somebody is watching, and production must be able to stop sending
+    # without a deploy when a relay is being moved.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = Field(default="", repr=False)
+    #: STARTTLS on the standard submission port. Implicit TLS (465) is
+    #: `smtp_ssl`; the two are mutually exclusive and the guard below says so.
+    smtp_starttls: bool = True
+    smtp_ssl: bool = False
+    smtp_timeout_seconds: float = 30.0
+
+    report_from_address: str = "lnd-analytics@example.com"
+    #: Comma-separated. A list rather than one address because the monthly
+    #: report goes to a group, and a distribution list nobody can enumerate is
+    #: a delivery nobody can audit.
+    report_recipients: str = ""
+    #: Attach the PDF alongside the workbook. Both are kept as editions either
+    #: way; this only decides what leaves in the mail.
+    report_attach_pdf: bool = True
+
     # -- development-only auth shortcut -------------------------------------
     auth_dev_bypass: bool = False
     auth_dev_user_email: str = "dev@example.com"
@@ -171,6 +200,19 @@ class Settings(BaseSettings):
     @property
     def scope_list(self) -> list[str]:
         return self.oidc_scopes.split()
+
+    @property
+    def smtp_configured(self) -> bool:
+        return bool(self.smtp_host)
+
+    @property
+    def recipient_list(self) -> list[str]:
+        """The report's recipients, trimmed and de-blanked.
+
+        A trailing comma in an environment variable is not an empty recipient,
+        and an SMTP server handed one rejects the whole message.
+        """
+        return [address.strip() for address in self.report_recipients.split(",") if address.strip()]
 
     # -- guards -------------------------------------------------------------
     @model_validator(mode="after")
@@ -206,6 +248,19 @@ class Settings(BaseSettings):
             raise ValueError(
                 "SOURCE_RECORD_FIXTURES writes source payloads to disk and must "
                 "never be enabled in production — those payloads contain PII."
+            )
+
+        if self.smtp_starttls and self.smtp_ssl:
+            raise ValueError(
+                "SMTP_STARTTLS and SMTP_SSL are mutually exclusive: STARTTLS upgrades "
+                "a plain connection, SSL wraps one from the first byte."
+            )
+
+        encrypted = self.smtp_starttls or self.smtp_ssl
+        if self.smtp_configured and self.is_production and not encrypted:
+            raise ValueError(
+                "SMTP in production must use STARTTLS or SSL. The monthly report "
+                "carries employee names."
             )
 
         return self

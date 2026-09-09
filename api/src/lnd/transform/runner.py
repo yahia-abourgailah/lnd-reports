@@ -53,6 +53,7 @@ from lnd.transform.invariant import (
     InvariantViolation,
     check_against_core,
     check_ledger,
+    check_no_silent_exclusion,
     offered_by_all,
 )
 from lnd.transform.programs import (
@@ -270,6 +271,15 @@ def transform_programs(session: Session, *, source_ids: list[str] | None = None)
     result.exceptions_raised = raised
     result.exceptions_open = still_open
     result.exceptions_resolved = resolved
+
+    # After the flush, because it reads the queue the flush just reconciled:
+    # nothing excluded from a figure may be excluded without an exception
+    # naming it. Also only sound for a full pass — a narrowed one resolves
+    # nothing and would compare the whole of `core` against one programme's
+    # worth of exceptions.
+    if not partial:
+        session.flush()
+        check_no_silent_exclusion(session)
 
     log.info(
         "transform complete",

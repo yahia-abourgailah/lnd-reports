@@ -18,6 +18,7 @@ import { Coverage } from './components/Coverage'
 import { FilterBar } from './components/FilterBar'
 import { FreshnessBadge } from './components/FreshnessBadge'
 import { Enrichment } from './components/Enrichment'
+import { Exceptions } from './components/Exceptions'
 import { Funnel } from './components/Funnel'
 import { Kpis } from './components/Kpis'
 import { LearnerProfile } from './components/LearnerProfile'
@@ -58,7 +59,7 @@ function Dashboard() {
   // `/reports` it would be worse than useless: a published edition covers the
   // month it covered, and a filter bar above it would suggest otherwise.
   const path = useLocation().pathname
-  const analytical = path !== '/enrichment' && path !== '/reports'
+  const analytical = path !== '/enrichment' && path !== '/reports' && path !== '/exceptions'
   const me = useQuery({ queryKey: ['me'], queryFn: getMe })
 
   // The badge reads the envelope of the request the page already made, rather
@@ -88,6 +89,7 @@ function Dashboard() {
             <NavLink to="/trainers">Trainers</NavLink>
             <NavLink to="/learners">Learners</NavLink>
             <NavLink to="/reports">Reports</NavLink>
+            <NavLink to="/exceptions">Exceptions</NavLink>
             <NavLink to="/enrichment">Enrichment</NavLink>
           </nav>
 
@@ -121,6 +123,7 @@ function Dashboard() {
           <Route path="/learners" element={<Learners filters={filters} />} />
           <Route path="/learners/:key" element={<LearnerProfile filters={filters} />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/exceptions" element={<Exceptions />} />
           <Route path="/enrichment" element={<Enrichment />} />
           <Route
             path="*"
