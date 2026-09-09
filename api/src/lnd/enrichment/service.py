@@ -104,6 +104,45 @@ def _entry(kind: OverlayKind, row: Any) -> OverlayEntry:
     )
 
 
+def coerce(kind: OverlayKind, name: str, given: Any) -> Any:
+    """Put a value into the type its column holds, or refuse and say so.
+
+    JSON has no integers-in-a-dropdown. A form sends `"77"` for a programme id
+    because that is what an HTML `<select>` produces, and PostgreSQL answers
+    `operator does not exist: integer = character varying` — which surfaced as a
+    500 and told the person filling the form nothing at all.
+
+    Coercing here rather than in the caller means every route, every form and
+    every script gets the same behaviour. A value that genuinely cannot be
+    converted raises `EnrichmentConflict`, which the API already turns into a
+    422 with the message in it.
+    """
+    column = getattr(TABLES[kind].model, name, None)
+    python_type: type[Any] | None = None
+    if column is not None:
+        try:
+            python_type = column.type.python_type
+        except NotImplementedError:  # pragma: no cover - enum columns, already str
+            python_type = None
+
+    if given is None or python_type is None or isinstance(given, python_type):
+        return given
+    # bool before int: `issubclass(bool, int)` is true, and `int(True)` is a
+    # silent 1 in a column that meant something else.
+    if python_type is bool or isinstance(given, bool):
+        return given
+    try:
+        return python_type(given)
+    except (TypeError, ValueError):
+        raise EnrichmentConflict(
+            f"{kind.value}.{name} takes {python_type.__name__}, not {given!r}"
+        ) from None
+
+
+def _coerced(kind: OverlayKind, fields: dict[str, Any]) -> dict[str, Any]:
+    return {name: coerce(kind, name, value) for name, value in fields.items()}
+
+
 def _matching(kind: OverlayKind, key: dict[str, Any]) -> Select[Any]:
     table = TABLES[kind]
     missing = set(table.key) - set(key)
@@ -113,7 +152,7 @@ def _matching(kind: OverlayKind, key: dict[str, Any]) -> Select[Any]:
         )
     statement = select(table.model)
     for name in table.key:
-        statement = statement.where(getattr(table.model, name) == key[name])
+        statement = statement.where(getattr(table.model, name) == coerce(kind, name, key[name]))
     return statement
 
 
@@ -171,6 +210,13 @@ def author(
             f"{kind.value} needs {', '.join(sorted(missing))} — a partial override would "
             "leave the other fields at whatever the superseded row happened to hold"
         )
+
+    # Into the types the columns hold, once, before anything touches the
+    # database. A `<select>` sends "77" for a programme id, and PostgreSQL
+    # answers `operator does not exist: integer = character varying` — which
+    # reached the person filling the form as a 500 and told them nothing.
+    key = _coerced(kind, key)
+    values = _coerced(kind, values)
 
     stamp = now or dt.datetime.now(dt.UTC)
     # Close first. The unique index is partial on `superseded_at IS NULL`, so

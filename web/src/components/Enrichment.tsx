@@ -16,14 +16,18 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 import {
+  getEnrichmentForms,
   getOverlay,
   getOverlayHistory,
   putOverlay,
   retireOverlay,
+  type FormField,
   type OverlayEntry,
+  type OverlayForm,
 } from '../api'
 
 const KINDS: { kind: string; label: string; blurb: string; keyFields: string[]; valueFields: string[] }[] = [
@@ -91,9 +95,26 @@ function History({ kind, entry }: { kind: string; entry: OverlayEntry }) {
   )
 }
 
-function Table({ kind, label, blurb, valueFields }: (typeof KINDS)[number]) {
+function Table({
+  kind,
+  label,
+  blurb,
+  asked,
+  form,
+}: (typeof KINDS)[number] & { asked: boolean; form?: OverlayForm }) {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState<number | null>(null)
+  const section = useRef<HTMLElement>(null)
+
+  // The exception console links here with `?kind=`, naming the one form that
+  // fixes the rule somebody was reading about. Without this the link dropped
+  // them at the top of a page with four forms on it and no indication which —
+  // which is a link that technically works and practically does not.
+  useEffect(() => {
+    if (asked && section.current) {
+      section.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [asked])
   const entries = useQuery({ queryKey: ['overlay', kind], queryFn: () => getOverlay(kind) })
 
   const withdraw = useMutation({
@@ -109,9 +130,10 @@ function Table({ kind, label, blurb, valueFields }: (typeof KINDS)[number]) {
   const rows = entries.data?.entries ?? []
 
   return (
-    <section className="enrich">
+    <section className={asked ? 'enrich enrich-asked' : 'enrich'} ref={section}>
       <header className="enrich-head">
         <h2>{label}</h2>
+        {asked && <p className="enrich-asked-note">This is the form you were sent to.</p>}
         <p className="muted">{blurb}</p>
       </header>
 
@@ -151,85 +173,227 @@ function Table({ kind, label, blurb, valueFields }: (typeof KINDS)[number]) {
         </div>
       ))}
 
-      {valueFields.length > 0 && <BulkAssign kind={kind} label={label} />}
+      {form && <AuthorForm form={form} />}
     </section>
   )
 }
 
 /**
- * Assign many keys to one value in a single pass.
+ * The form that authors one decision.
  *
- * The case this exists for is trainer names: sixteen spellings, one of which
- * is a duplicate of another, and doing that one at a time invites stopping
- * halfway. Each assignment is still its own authored row — a bulk action is a
+ * WHY IT IS DESCRIBED BY THE SERVER
+ *
+ * This used to be one generic form for all five overlays: a box for the column
+ * name, a box for the keys, and a box where you hand-wrote JSON. It worked, and
+ * only for whoever built it — the person who actually needs it is a specialist
+ * looking at "Programme 77 has no trainer" and wanting to say who the trainer
+ * was. They should not have to know that the column is `crm_program_id`.
+ *
+ * So `/v1/enrichment/forms` says what each form asks for, in words, with its
+ * options read from the data: which programmes exist, which trainers, which of
+ * the five dimensions a survey question can measure. Nothing about the shape of
+ * these forms is written here. A list typed into a front end goes stale
+ * silently, and the first symptom is a value somebody cannot select.
+ *
+ * ONE AT A TIME, EXCEPT WHERE MANY IS THE POINT
+ *
+ * Only trainer spellings support several keys at once — sixteen spellings, one
+ * of which is a duplicate of another, and doing that one at a time invites
+ * stopping halfway. Each is still its own authored row: a bulk action is a
  * convenience for the person, not a shortcut through the audit trail.
  */
-function BulkAssign({ kind, label }: { kind: string; label: string }) {
-  const queryClient = useQueryClient()
-  const [keys, setKeys] = useState('')
-  const [value, setValue] = useState('')
-  const [note, setNote] = useState('')
-  const [field, setField] = useState('')
+function Field({
+  field,
+  value,
+  onChange,
+}: {
+  field: FormField
+  value: string
+  onChange: (next: string) => void
+}) {
+  return (
+    <label className="bulk-field">
+      <span>
+        {field.label}
+        {!field.required && <em className="field-optional"> · optional</em>}
+      </span>
+      {field.input === 'select' ? (
+        <select value={value} onChange={(event) => onChange(event.target.value)}>
+          <option value="">Choose…</option>
+          {field.options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type={field.input === 'number' ? 'number' : 'text'}
+          value={value}
+          placeholder={field.placeholder}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
+      {field.help && <em className="field-help">{field.help}</em>}
+    </label>
+  )
+}
 
-  const assign = useMutation({
+function AuthorForm({ form }: { form: OverlayForm }) {
+  const queryClient = useQueryClient()
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [bulk, setBulk] = useState('')
+  const [note, setNote] = useState('')
+  const [done, setDone] = useState<string | null>(null)
+
+  const bulkField = form.supports_bulk ? form.key[0] : null
+  const set = (name: string) => (next: string) =>
+    setAnswers((was) => ({ ...was, [name]: next }))
+
+  // Numbers go to the API as numbers. A scale of "5" stored as a string sorts
+  // before "10" and compares to nothing, which is P-05's shape in a new place.
+  const typed = (fields: FormField[]) =>
+    Object.fromEntries(
+      fields
+        .map((field) => [field, (answers[field.name] ?? '').trim()] as const)
+        .filter(([, given]) => given !== '')
+        .map(([field, given]) => [
+          field.name,
+          field.input === 'number' ? Number(given) : given,
+        ]),
+    )
+
+  const missing = [...form.key, ...form.values].filter(
+    (field) =>
+      field.required &&
+      !(bulkField && field.name === bulkField.name) &&
+      (answers[field.name] ?? '').trim() === '',
+  )
+  const keys = bulk
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const ready = missing.length === 0 && (!bulkField || keys.length > 0)
+
+  const save = useMutation({
     mutationFn: async () => {
-      const lines = keys
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
+      const values = typed(form.values)
+      const rest = typed(form.key)
+      const targets = bulkField
+        ? keys.map((one) => ({ ...rest, [bulkField.name]: one }))
+        : [rest]
       // Sequential rather than parallel: each write supersedes the live row for
-      // its key, and two writes racing for one key would leave whichever landed
-      // second looking like the earlier decision.
-      for (const line of lines) {
-        const [keyName, keyValue] = line.includes('=') ? line.split('=', 2) : [field, line]
-        if (!keyName || keyValue === undefined) continue
-        await putOverlay(kind, { [keyName.trim()]: keyValue.trim() }, JSON.parse(value), note || null)
+      // its key, and two racing for one key would leave whichever landed second
+      // looking like the earlier decision.
+      for (const key of targets) {
+        await putOverlay(form.kind, key, values, note || null)
       }
+      return targets.length
     },
-    onSuccess: async () => {
-      setKeys('')
-      await queryClient.invalidateQueries({ queryKey: ['overlay', kind] })
+    onSuccess: async (count) => {
+      setAnswers({})
+      setBulk('')
+      setNote('')
+      setDone(
+        `Saved. ${count} decision${count === 1 ? '' : 's'} recorded — the figures pick it up when the transform next runs.`,
+      )
+      await queryClient.invalidateQueries({ queryKey: ['overlay', form.kind] })
       await queryClient.invalidateQueries({ queryKey: ['kpis'] })
+      await queryClient.invalidateQueries({ queryKey: ['exceptions'] })
     },
   })
 
   return (
     <details className="bulk">
-      <summary>Bulk assign</summary>
-      <p className="muted bulk-help">
-        One key per line. Each becomes its own authored row with the note below, so the history
-        records the decision rather than the batch.
-      </p>
-      <label className="bulk-field">
-        <span>Key field</span>
-        <input value={field} onChange={(e) => setField(e.target.value)} placeholder="normalised_name" />
-      </label>
-      <label className="bulk-field">
-        <span>Keys, one per line</span>
-        <textarea rows={4} value={keys} onChange={(e) => setKeys(e.target.value)} />
-      </label>
-      <label className="bulk-field">
-        <span>Value, as JSON</span>
-        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder='{"trainer_key": 3}' />
-      </label>
+      <summary>Add a decision</summary>
+      <p className="muted bulk-help">{form.purpose}</p>
+      {form.examples.map((example) => (
+        <p className="bulk-example" key={example}>
+          {example}
+        </p>
+      ))}
+
+      {form.key
+        .filter((field) => !bulkField || field.name !== bulkField.name)
+        .map((field) => (
+          <Field
+            key={field.name}
+            field={field}
+            value={answers[field.name] ?? ''}
+            onChange={set(field.name)}
+          />
+        ))}
+
+      {bulkField && (
+        <label className="bulk-field">
+          <span>{bulkField.label}</span>
+          <textarea
+            rows={4}
+            value={bulk}
+            placeholder={bulkField.placeholder}
+            onChange={(event) => setBulk(event.target.value)}
+          />
+          <em className="field-help">
+            {form.fields_note || 'One per line.'} {bulkField.help}
+          </em>
+        </label>
+      )}
+
+      {form.values.map((field) => (
+        <Field
+          key={field.name}
+          field={field}
+          value={answers[field.name] ?? ''}
+          onChange={set(field.name)}
+        />
+      ))}
+
       <label className="bulk-field">
         <span>Why</span>
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="two spellings, one person" />
+        <input
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder="Where this came from, or who confirmed it"
+        />
+        {/* Not required by the API, and asked for every time anyway. A decision
+            with no stated reason is one nobody can revisit in six months. */}
+        <em className="field-help">
+          Kept against your name, so this can be explained later.
+        </em>
       </label>
+
       <button
         type="button"
         className="button bulk-go"
-        disabled={assign.isPending || !keys.trim() || !value.trim() || !field.trim()}
-        onClick={() => assign.mutate()}
+        disabled={save.isPending || !ready}
+        onClick={() => {
+          setDone(null)
+          save.mutate()
+        }}
       >
-        {assign.isPending ? 'Assigning…' : `Assign to ${label.toLowerCase()}`}
+        {save.isPending ? 'Saving…' : 'Save'}
       </button>
-      {assign.isError && <p className="warn">{String(assign.error)}</p>}
+      {done && <p className="bulk-done">{done}</p>}
+      {save.isError && (
+        <p className="warn">That could not be saved. Check the values and try again.</p>
+      )}
     </details>
   )
 }
 
 export function Enrichment() {
+  // Which form the visitor was sent to, if they arrived from the exception
+  // console. Read from the URL rather than held in state, for the same reason
+  // the filter bar is: a link is the thing being followed.
+  const [params] = useSearchParams()
+  const asked = params.get('kind') ?? ''
+
+  // What each form asks for, and its live options. Fetched once for the page
+  // rather than per section: five sections asking the same question five times
+  // is five round trips for one answer.
+  const forms = useQuery({ queryKey: ['enrichment-forms'], queryFn: getEnrichmentForms })
+  const byKind = Object.fromEntries((forms.data ?? []).map((form) => [form.kind, form]))
+
   return (
     <>
       <div className="scope">
@@ -242,7 +406,12 @@ export function Enrichment() {
         </p>
       </div>
       {KINDS.map((entry) => (
-        <Table key={entry.kind} {...entry} />
+        <Table
+          key={entry.kind}
+          {...entry}
+          asked={entry.kind === asked}
+          form={byKind[entry.kind]}
+        />
       ))}
     </>
   )

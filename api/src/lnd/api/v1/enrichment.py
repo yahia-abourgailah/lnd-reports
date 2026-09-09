@@ -29,6 +29,7 @@ from lnd.enrichment import (
     live,
     retire,
 )
+from lnd.enrichment import forms as enrichment_forms
 from lnd.metrics.cache import invalidate as invalidate_metrics_cache
 
 router = APIRouter(prefix="/enrichment", tags=["enrichment"])
@@ -84,6 +85,74 @@ def _out(entry: OverlayEntry) -> EntryOut:
         is_live=entry.is_live,
         note=entry.note,
     )
+
+
+class OptionOut(BaseModel):
+    value: str
+    label: str
+
+
+class FieldOut(BaseModel):
+    """One question a form asks, in the terms of the person answering it."""
+
+    name: str
+    label: str
+    #: `text`, `number` or `select`.
+    input: str
+    help: str
+    options: list[OptionOut]
+    placeholder: str
+    required: bool
+
+
+class FormOut(BaseModel):
+    kind: str
+    label: str
+    purpose: str
+    key: list[FieldOut]
+    values: list[FieldOut]
+    supports_bulk: bool
+    fields_note: str
+    examples: list[str]
+
+
+# Declared before `/{kind}` on purpose: a templated segment matches `forms`
+# too, and the first route wins — so leaving this second means the screen asks
+# for a form and gets a 422 about an unknown overlay kind.
+@router.get("/forms", response_model=list[FormOut])
+def list_forms(session: DbSession, _user: CurrentUser) -> list[FormOut]:
+    """What each overlay form asks for, with its options read from the data.
+
+    The screen renders from this rather than from a copy of the schema written
+    in TypeScript. Two descriptions of one form is how a front end comes to
+    offer a field the write path refuses — and how a list of programmes goes
+    stale without anybody noticing until somebody cannot find one.
+    """
+
+    def out(item: enrichment_forms.FormField) -> FieldOut:
+        return FieldOut(
+            name=item.name,
+            label=item.label,
+            input=item.input.value,
+            help=item.help,
+            options=[OptionOut(value=o.value, label=o.label) for o in item.options],
+            placeholder=item.placeholder,
+            required=item.required,
+        )
+
+    return [
+        FormOut(
+            kind=form.kind.value,
+            label=form.label,
+            purpose=form.purpose,
+            key=[out(item) for item in form.key],
+            values=[out(item) for item in form.values],
+            supports_bulk=form.supports_bulk,
+            fields_note=form.fields_note,
+            examples=list(form.examples),
+        )
+        for form in enrichment_forms.forms(session)
+    ]
 
 
 @router.get("/{kind}", response_model=EntriesResponse)
