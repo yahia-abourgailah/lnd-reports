@@ -1358,11 +1358,12 @@ button.kpi-value:disabled,
 /* ------------------------------------------------------------ grouped bars */
 .grouped-plot {
   display: flex; align-items: flex-end; gap: 6px;
-  height: 156px;
-  /* Room above the plot for the tallest bar's own number, which sits 13px over
-     it. 14px was not enough — the tallest column reached the top and its label
-     was cut in half by the panel. */
-  padding-top: 20px;
+  /* No fixed height. `overflow-x: auto` forces `overflow-y` to `auto` as well —
+     the axes cannot disagree — so a box one pixel shorter than its content grew
+     a vertical scrollbar and clipped the very numbers above the tallest bars.
+     `.grouped-bars` sets the drawing height; this only needs room above it for
+     a label that sits 13px over the tallest column. */
+  padding-top: 18px;
   overflow-x: auto;
 }
 .grouped-col { display: flex; flex-direction: column; gap: 5px; flex: 1 1 0; min-width: 34px; }
