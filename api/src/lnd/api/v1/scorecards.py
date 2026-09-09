@@ -34,6 +34,13 @@ class ProgramSummary(BaseModel):
     capacity: int | None = None
     start_date: dt.date | None = None
     end_date: dt.date | None = None
+    #: Distinct people who attended. Defaulted so `ProgramHeaderOut`, which
+    #: describes one programme rather than a list, is unaffected.
+    participants: int = 0
+    #: Rows, not people — the enrollment grain is one person on one programme,
+    #: and the gap between this and `participants` is what the overview's
+    #: enrolment chart draws.
+    enrollments: int = 0
 
 
 class ProgramHeaderOut(ProgramSummary):

@@ -20,8 +20,27 @@
   --rule: #dbe1e4;
   --rule-soft: #eceff1;
 
-  --accent: #10605a;
-  --accent-soft: #dceceb;
+  /* The workbook's own dashboard, sampled from `docs/L&D Main Reports.xlsx`:
+     navy ground, white labels, orange figures, green marks. Carried here so
+     the screen L&D already knows is the screen they open. Brand tokens do not
+     flip between themes — a masthead that changed colour with the OS would
+     stop being a masthead. */
+  --brand: #163e64;
+  --brand-2: #1d4c79;
+  --brand-rule: #2c5b85;
+  --brand-ink: #ffffff;
+  --brand-ink-2: #c9d2db;
+  /* 3.60:1 on navy — AA for the large figures it is used on, and nothing
+     else. `--figure-soft` is the step that clears 4.5:1 where orange has to
+     carry body-size text. */
+  --figure: #e97132;
+  --figure-soft: #f58b4c;
+
+  /* Interactive. Shifted into the workbook's blue family so it sits with the
+     masthead rather than against it; still not the semantic set, and still not
+     the series. */
+  --accent: #1f5c99;
+  --accent-soft: #dfe9f4;
 
   --ok: #2a6640;
   --ok-soft: #e0efe5;
@@ -41,34 +60,20 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ground: #0c1112;
-    --surface: #151c1e;
-    --surface-2: #1d2628;
-    --ink: #e5edec;
-    --ink-2: #aab8b7;
-    --ink-3: #7a8a89;
-    --rule: #263031;
-    --rule-soft: #1e2728;
-
-    --accent: #4dbdaa;
-    --accent-soft: #10302d;
-
-    --ok: #6fbe87;
-    --ok-soft: #14291c;
-    --warn: #d6a342;
-    --warn-soft: #2e2612;
-    --bad: #e07e66;
-    --bad-soft: #331d18;
-
-    --moved: #c896c4;
-    --moved-soft: #2a1e29;
-
-    --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 10px 28px -22px rgb(0 0 0 / 80%);
-    color-scheme: dark;
-  }
-}
+/* ONE LOOK, WHATEVER THE MACHINE IS SET TO
+ *
+ * There was a dark theme here, switched by `prefers-color-scheme`. It is gone
+ * on purpose. The workbook this replaces has one appearance, and so should
+ * this: two people looking at the same figure should not be describing
+ * different-looking screens, and a report walked through on a projector should
+ * look like the report the specialist opened that morning.
+ *
+ * `color-scheme: light` above is what carries that into the parts the CSS does
+ * not own — date pickers, select menus, scrollbars — which would otherwise
+ * render dark inside a light page.
+ *
+ * The navy is the brand, not a theme. It is the masthead and the figures, and
+ * it is the same navy in every condition. */
 
 * { box-sizing: border-box; }
 
@@ -405,12 +410,13 @@ body {
 
 /* ---------------------------------------------------------------- week 6 */
 
-/* The series colour. Both steps validated against their own card surface —
- * the dark one is not a lightened flip of the light one, it is its own step
- * from the same ramp. The interactive accent is deliberately not reused: a
- * data mark and a button should not be the same colour. */
-:root { --series: #0d9488; }
-@media (prefers-color-scheme: dark) { :root { --series: #22a693; } }
+/* The series colour is the workbook's own green, and it is one value rather
+ * than two: every sparkline sits inside a KPI card, and that card is navy in
+ * both themes. #92D050 reads 5.96:1 on #163E64 — comfortably AA, which its
+ * companion blue #0070C0 is not, so the blue is lightened for anything drawn
+ * on the navy. The interactive accent is still not reused: a data mark and a
+ * button should not be the same colour. */
+:root { --series: #92d050; --series-2: #4da3e8; }
 
 /* -------------------------------------------------------------- sparkline */
 .spark { margin: 10px 0 0; display: block; }
@@ -1016,4 +1022,425 @@ td.num, .ranked td.num {
 .bulk-done {
   margin: 10px 0 0; padding: 8px 11px; border-radius: 6px;
   background: var(--ok-soft); color: var(--ok); font-size: 13px;
+}
+
+/* ===========================================================================
+   THE WORKBOOK'S IDENTITY
+   ===========================================================================
+   Sampled from the DASHBOARD tab of `L&D Main Reports.xlsx` — navy #163E64,
+   white labels, orange figures, green marks. The point is recognition: the
+   people being asked to accept eleven restated figures should not also be
+   asked to learn a new-looking screen on the same day.
+
+   It is applied where the workbook applied it — the masthead and the figures —
+   and no further. The workbook's dashboard is one screen of large numbers; ours
+   also carries 288-row tables, forms and drill-through grids, and long lists of
+   small text are easier to scan on the light ground. Navy where it reads,
+   light where it works.
+
+   Everything below re-points existing components at the brand tokens rather
+   than introducing new ones, so the theme still resolves as a set. */
+
+/* ------------------------------------------------------------- the masthead */
+.chrome {
+  background: var(--brand);
+  border-bottom: 1px solid var(--brand);
+}
+.chrome .brand-name { color: var(--brand-ink); }
+.chrome .brand-mark { background: var(--series); }
+
+.tabs a { color: var(--brand-ink-2); }
+.tabs a:hover { background: var(--brand-2); color: var(--brand-ink); }
+/* The active tab takes the workbook's green rather than a translucent panel:
+   on navy, a tinted background reads as a disabled control. */
+.tabs a.active { background: var(--brand-2); color: var(--series); }
+.tabs a:focus-visible { outline: 2px solid var(--series); outline-offset: 1px; }
+
+.chrome-right .linkish { color: var(--brand-ink-2); }
+.chrome-right .linkish:hover { color: var(--brand-ink); }
+
+/* The freshness badge sits in the masthead, so its three states need to read on
+   navy rather than on the light ground they were mixed for. Same three
+   meanings, restated against this surface. */
+.chrome .badge-ok { background: rgb(146 208 80 / 16%); color: var(--series); }
+.chrome .badge-warn { background: rgb(233 113 50 / 18%); color: var(--figure-soft); }
+.chrome .badge-bad { background: rgb(224 126 102 / 20%); color: #f0a08e; }
+.chrome .badge-lag { color: var(--brand-ink-2); }
+
+/* --------------------------------------------------------------- the figures */
+/* Both the overview's KPI cards and the scorecards' figures: they are the same
+   object, and splitting them would read as a bug rather than a distinction. */
+.kpi,
+.figure {
+  background: var(--brand);
+  border-color: var(--brand-rule);
+}
+.kpi-empty,
+.figure-empty {
+  background: var(--brand);
+  border-style: dashed;
+  border-color: var(--brand-rule);
+}
+
+.kpi-head h3,
+.figure-head h4 { color: var(--brand-ink-2); }
+
+.kpi-value,
+button.kpi-value,
+.figure-value {
+  color: var(--figure);
+}
+.kpi-empty .kpi-value,
+button.kpi-value:disabled,
+.figure-empty .figure-value { color: var(--brand-ink-2); }
+
+.kpi-sample,
+.figure-sample,
+.spark-caption { color: var(--brand-ink-2); }
+.spark-value { color: var(--brand-ink); }
+/* A flagged sample is still a warning, and orange is the figure colour here —
+   so it says so in green's absence with the softer orange plus a rule. */
+.kpi-flag { color: var(--figure-soft); }
+
+.kpi-info {
+  border-color: var(--brand-rule);
+  color: var(--brand-ink-2);
+}
+.kpi-info:hover { border-color: var(--series); color: var(--series); }
+.kpi-info:focus-visible { outline: 2px solid var(--series); outline-offset: 1px; }
+
+/* Provenance chips, restated for navy. The meanings are unchanged: corrected is
+   the one that cost a published figure, restated is a definition that now says
+   what it counts, new never existed before. */
+.kpi .tag-corrected,
+.figure .tag-corrected { background: rgb(224 126 102 / 20%); color: #f4a894; }
+.kpi .tag-restated,
+.kpi .tag-renamed,
+.figure .tag-restated,
+.figure .tag-renamed { background: rgb(200 150 196 / 20%); color: #dcb4d9; }
+.kpi .tag-new,
+.figure .tag-new { background: rgb(77 163 232 / 20%); color: var(--series-2); }
+
+/* The definition popover hangs off the bottom of a navy card, so it belongs to
+   the card rather than to the page behind it. */
+.kpi-tip {
+  background: var(--brand-2);
+  border-color: var(--brand-rule);
+  color: var(--brand-ink-2);
+}
+.kpi-tip-population { color: var(--brand-ink-2); }
+.kpi-tip-population strong { color: var(--brand-ink); }
+.kpi-tip-excludes { color: var(--brand-ink-2); }
+.kpi-tip-note { background: rgb(255 255 255 / 8%); color: var(--brand-ink); }
+
+.spark-none { color: var(--brand-ink-2); }
+
+/* --------------------------------------------------- the bar, also on navy */
+/* The filter bar lives inside the masthead, so its own small text was mixed
+   for the light ground and lands at about 2.6:1 on this one. The controls
+   themselves stay white pills — a filter is a thing you press, and on navy a
+   white pill says so more plainly than an outline would. */
+.filterbar .filter-to,
+.filterbar .filter-dates > label > span { color: var(--brand-ink-2); }
+
+/* Clear sits on navy, and the interactive blue does not survive there. */
+.filter-clear { color: var(--series); }
+
+/* A narrowed filter takes the workbook's green rather than a pale blue tint:
+   against nine white pills, "which of these is on" has to read instantly. */
+.filter-active {
+  border-color: var(--series);
+  background: var(--series);
+  color: var(--brand);
+}
+.filter-active:hover { border-color: var(--series); }
+.filter-count { background: var(--brand); color: var(--series); }
+.filter-active .filter-count { background: var(--brand); color: var(--series); }
+
+/* ===========================================================================
+   THE BOARD
+   ===========================================================================
+   The DASHBOARD tab's own arrangement: one strip of headline figures across
+   the top, a row of three charts, then a row of two. */
+
+.strip {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 32px;
+  align-items: stretch;
+  background: var(--brand);
+  border: 1px solid var(--brand-rule);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin: 0 0 20px;
+}
+.strip-figures {
+  display: grid;
+  /* Nine, in one row, as the workbook has them. `auto-fit` wrapped them onto
+     two and broke the strip's whole point — it is a strip. */
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 4px 14px;
+}
+.strip-figure { min-width: 0; }
+.strip-label {
+  margin: 0 0 4px;
+  font-size: 12px; font-weight: 550;
+  color: var(--brand-ink-2);
+  line-height: 1.3;
+}
+.strip-value {
+  margin: 0;
+  /* Shrinks to fit rather than wrapping: "365.2 hours" broken over two lines
+     pushed the whole strip taller and left eight figures floating. */
+  font-size: clamp(17px, 1.45vw, 25px); font-weight: 650;
+  white-space: nowrap;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  color: var(--figure);
+  line-height: 1.1;
+}
+.strip-sample {
+  margin: 3px 0 0;
+  font: 400 11.5px/1.4 var(--mono);
+  color: var(--brand-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Participation and the public/customised split sat apart on the right of the
+   workbook's strip, and they belong apart: one is the figure that moved most
+   in the whole project, and the other is a share of programmes rather than of
+   people. */
+.strip-side {
+  display: flex; flex-direction: column; gap: 14px;
+  padding-left: 28px;
+  border-left: 1px solid var(--brand-rule);
+  min-width: 210px;
+}
+.strip-lead .strip-value { font-size: 34px; }
+/* Its own block with its own caption. Without one, two percentages stacked
+   under "201 of 1,487 employees" read as more of the same sentence — and one
+   counts people while the other counts programmes. */
+.strip-split { margin: 0; padding-top: 10px; border-top: 1px solid var(--brand-rule); }
+.strip-split-head {
+  margin: 0 0 6px;
+  font: 400 11px/1.3 var(--mono);
+  color: var(--brand-ink-2);
+  letter-spacing: 0.02em;
+}
+.strip-split dl { margin: 0; display: flex; flex-direction: column; gap: 5px; }
+.strip-split div { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.strip-split dt { font-size: 12px; color: var(--brand-ink-2); }
+.strip-split dd {
+  margin: 0;
+  display: flex; align-items: baseline; gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.strip-split dd b { font: 600 15px/1 var(--mono); color: var(--series); }
+/* The count beside the share, because "48 of 55" cannot be misread as people. */
+.strip-split dd em {
+  font: 400 11.5px/1 var(--mono);
+  font-style: normal;
+  color: var(--brand-ink-2);
+  min-width: 2ch; text-align: right;
+}
+
+/* ------------------------------------------------------------- chart panels */
+.board { display: grid; gap: 16px; margin: 0 0 20px; }
+.board-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.board-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.panel {
+  background: var(--brand);
+  border: 1px solid var(--brand-rule);
+  border-radius: 10px;
+  padding: 16px 18px 14px;
+  min-width: 0;
+  display: flex; flex-direction: column;
+}
+.panel h3 {
+  margin: 0 0 3px;
+  font-size: 14px; font-weight: 600;
+  color: var(--brand-ink);
+}
+.panel-note {
+  margin: 0 0 14px;
+  font-size: 12px; line-height: 1.45;
+  color: var(--brand-ink-2);
+}
+
+.chart-empty {
+  margin: 0; padding: 20px 0;
+  font-size: 13px; color: var(--brand-ink-2);
+}
+/* Every chart names its own maximum. The workbook printed a number beside each
+   bar and drew no axis, so two charts of different magnitudes read alike. */
+.chart-scale {
+  margin: 10px 0 0;
+  font: 400 11px/1.4 var(--mono);
+  color: var(--brand-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.chart-key {
+  list-style: none; margin: 0 0 10px; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  font-size: 11.5px; color: var(--brand-ink-2);
+}
+.chart-key li { display: flex; align-items: center; gap: 6px; }
+.chart-key b { color: var(--brand-ink); font-variant-numeric: tabular-nums; }
+.key-swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.key-a { background: var(--series); }
+.key-b { background: var(--series-2); }
+.key-c { background: var(--figure); }
+
+/* ------------------------------------------------------------------- donut */
+.donut { display: flex; align-items: center; gap: 18px; }
+.donut svg { width: 132px; height: 132px; flex: none; }
+.donut-total {
+  font: 600 22px/1 var(--mono);
+  fill: var(--brand-ink);
+}
+.donut-total-label { font: 400 10px/1 var(--sans); fill: var(--brand-ink-2); }
+.donut .chart-key { flex-direction: column; margin: 0; gap: 8px; }
+
+/* ------------------------------------------------------------ grouped bars */
+.grouped-plot {
+  display: flex; align-items: flex-end; gap: 6px;
+  height: 150px;
+  /* Room above the plot for the tallest bar's own number, which sits 13px
+     over it and was being clipped by the panel. */
+  padding-top: 14px;
+  overflow-x: auto;
+}
+.grouped-col { display: flex; flex-direction: column; gap: 5px; flex: 1 1 0; min-width: 34px; }
+.grouped-bars { display: flex; align-items: flex-end; gap: 2px; height: 128px; }
+.gbar {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  position: relative;
+}
+.gbar span {
+  position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+  font: 400 9.5px/1 var(--mono);
+  color: var(--brand-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.gbar-a { background: var(--series); }
+.gbar-b { background: var(--figure); }
+.gbar-c { background: var(--series-2); }
+.grouped-label {
+  font: 400 10.5px/1 var(--mono);
+  color: var(--brand-ink-2);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------- horizontal bars */
+/* `cbar`, not `bar`: the coverage screen owns `.bar-row` and `.bar-track`
+   already, and sharing the names painted its grey track behind every bar on
+   this board. */
+.cbar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 40%) minmax(0, 1fr);
+  gap: 0 10px;
+  align-items: center;
+  padding: 3px 0;
+}
+.cbar-name {
+  font-size: 11.5px;
+  color: var(--brand-ink-2);
+  text-align: right;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cbar-track { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cbar {
+  height: 9px;
+  border-radius: 0 2px 2px 0;
+  min-width: 2px;
+  position: relative;
+  display: block;
+}
+.cbar b {
+  position: absolute; left: calc(100% + 5px); top: -2px;
+  font: 400 10px/1.3 var(--mono);
+  color: var(--brand-ink);
+  font-variant-numeric: tabular-nums;
+}
+.cbar-a { background: var(--series); }
+.cbar-b { background: var(--series-2); }
+
+/* ---------------------------------------------------- back to our own view */
+.board-break { margin: 34px 0 4px; }
+.board-break h2 {
+  margin: 0 0 2px;
+  font-size: 17px; font-weight: 620; letter-spacing: -0.01em;
+}
+.board-break .muted { margin: 0; font-size: 13px; }
+
+@media (max-width: 1400px) {
+  .strip-figures { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media (max-width: 1100px) {
+  .board-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .strip-figures { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 820px) {
+  .board-3, .board-2 { grid-template-columns: minmax(0, 1fr); }
+  .strip { grid-template-columns: minmax(0, 1fr); }
+  .strip-side { padding-left: 0; border-left: 0; border-top: 1px solid var(--brand-rule); padding-top: 14px; }
+}
+
+/* The year, once, under the column where it changes — fifteen months in a
+   380px panel leaves 25px a column, and "Jul 2025" overlapped its neighbour. */
+.grouped-label em {
+  display: block;
+  font-style: normal;
+  font-size: 9.5px;
+  color: var(--series);
+}
+/* The donut is short and its row is as tall as the trainer chart beside it.
+   Centred rather than left floating above dead space. */
+.panel > .donut { margin-top: auto; margin-bottom: auto; }
+
+/* ------------------------------------------------------- what we check for */
+/* Eleven rules, of which one is usually firing. Listing only the firing one
+   answers the wrong question: somebody deciding whether to trust a figure is
+   asking what the platform checks, not what is broken today. */
+.checks-band { margin-top: 14px; }
+.checks-band h3 {
+  margin: 0 0 8px;
+  font: 600 11px/1 var(--mono);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.checks-list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1px;
+  background: var(--rule); border: 1px solid var(--rule);
+}
+.checking {
+  background: var(--surface);
+  display: grid; grid-template-columns: 52px 1fr; gap: 0 12px;
+  padding: 11px 14px;
+  align-items: baseline;
+}
+.checking-state {
+  font: 600 9.5px/1.6 var(--mono);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ok); text-align: center;
+  background: var(--ok-soft); border-radius: 3px;
+  padding: 2px 0;
+}
+.checking.open .checking-state { color: var(--warn); background: var(--warn-soft); }
+.checking-title { margin: 0; font-size: 13.5px; font-weight: 550; }
+.checking-means { margin: 2px 0 0; font-size: 12px; line-height: 1.45; color: var(--ink-3); }
+
+/* The count in the nav. Losses only — a flagged record is in the figures, and
+   badging those would train people to ignore the badge that means something. */
+.tab-count {
+  margin-left: 7px;
+  font: 600 10.5px/1 var(--mono);
+  background: var(--figure); color: var(--brand);
+  border-radius: 999px; padding: 2px 6px;
+  vertical-align: 1px;
 }

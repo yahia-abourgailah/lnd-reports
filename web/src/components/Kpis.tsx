@@ -20,6 +20,7 @@ import { DrillDrawer } from './DrillDrawer'
 import { ExclusionBanner } from './ExclusionBanner'
 import { ExportMenu } from './ExportMenu'
 import { KpiCard } from './KpiCard'
+import { Overview } from './Overview'
 
 const GROUPS: { provenance: Metric['provenance'][]; title: string; note: string }[] = [
   {
@@ -88,6 +89,19 @@ export function Kpis({ filters }: { filters: Filters }) {
       </div>
 
       <ExclusionBanner excluded={excluded_count} flagged={flagged_count} />
+
+      {/* The board first, in the workbook's own arrangement — a strip of
+          headline figures, three charts, then two. Then the provenance groups
+          below, which are ours and have no counterpart there: they are how
+          somebody sees at a glance which figures changed and why. */}
+      <Overview filters={filters} metrics={metrics} />
+
+      <div className="board-break">
+        <h2>Every figure, and whether it moved</h2>
+        <p className="muted">
+          The same numbers again, grouped by what happened to them rather than by subject.
+        </p>
+      </div>
 
       {GROUPS.map((group) => {
         const shown = metrics.filter((m) => group.provenance.includes(m.provenance))

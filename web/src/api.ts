@@ -210,6 +210,11 @@ export interface ProgramSummary {
   capacity: number | null
   start_date: string | null
   end_date: string | null
+  /** Distinct people who attended. */
+  participants: number
+  /** Rows, not people — the gap between the two is the no-show the overview's
+   *  enrolment chart draws. */
+  enrollments: number
 }
 
 export interface ProgramHeader extends ProgramSummary {
@@ -652,3 +657,20 @@ export interface OverlayForm {
 }
 
 export const getEnrichmentForms = () => api<OverlayForm[]>('/enrichment/forms')
+
+/** Every rule the platform can detect, whether or not it is firing.
+ *
+ *  Not redundant with `/exceptions`, which carries the rule only for the ones
+ *  currently open — today that is 1 of 11. This answers the question somebody
+ *  asks *before* they trust a figure: what does this platform check for? */
+export const getDqRules = () => api<DqRuleInfo[]>('/exceptions/rules')
+
+export interface ExceptionSummary {
+  open: number
+  excluded: number
+  flagged: number
+  oldest_excluded_at: string | null
+}
+
+/** One line for the chrome: how many are open, and how many cost figures. */
+export const getExceptionSummary = () => api<ExceptionSummary>('/exceptions/summary')

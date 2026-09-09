@@ -405,9 +405,22 @@ def trainer_scorecard(
 
 
 def program_index(session: Session, filters: MetricFilters | None = None) -> list[dict[str, Any]]:
-    """Every programme in scope, with enough to choose one from a list."""
+    """Every programme in scope, with enough to choose one — or chart one.
+
+    `participants` and `enrollments` are here because the workbook's two widest
+    charts are per-programme: *Participation per Program* and *Enrollment Vs
+    Participation*. Drawing those from fifty-five scorecard requests would be
+    fifty-five round trips for one picture.
+
+    They are counted from `scope.attendances` and `scope.enrollments` — the same
+    statements every metric is built on — so a bar on the chart and the figure
+    on that programme's scorecard cannot disagree. Counting them here with a
+    query written for the chart is how a picture comes to tell a different story
+    from the number beside it.
+    """
     applied = filters or MetricFilters()
     scoped = scope.programs(applied).subquery()
+
     rows = session.execute(
         select(
             DimProgram.crm_program_id,
@@ -421,7 +434,49 @@ def program_index(session: Session, filters: MetricFilters | None = None) -> lis
         .where(DimProgram.crm_program_id.in_(select(scoped.c.crm_program_id)))
         .order_by(DimProgram.start_date.desc().nulls_last(), DimProgram.title)
     ).mappings()
-    return [dict(row) for row in rows]
+
+    index = [dict(row) for row in rows]
+    counts = _per_program_counts(session, applied)
+    for row in index:
+        pair = counts.get(int(row["crm_program_id"]), (0, 0))
+        row["participants"], row["enrollments"] = pair
+    return index
+
+
+def _per_program_counts(session: Session, filters: MetricFilters) -> dict[int, tuple[int, int]]:
+    """Distinct attendees and enrollments per programme, one pass each.
+
+    Both fact tables carry `crm_program_id`, so neither needs a join — and both
+    are read through the scope statements every metric is built on, so a bar and
+    the figure on that programme's scorecard cannot disagree.
+
+    Participants are *distinct people*; enrollments are rows. That asymmetry is
+    the point of the chart the pair feeds: somebody enrolled on a programme and
+    absent from it is the gap the two bars show.
+    """
+    attendance = scope.attendances(filters).subquery()
+    people: dict[int, int] = {
+        int(program_id): int(count)
+        for program_id, count in session.execute(
+            select(
+                attendance.c.crm_program_id,
+                func.count(func.distinct(attendance.c.employee_key)),
+            ).group_by(attendance.c.crm_program_id)
+        ).all()
+    }
+
+    enrollment = scope.enrollments(filters).subquery()
+    enrolled: dict[int, int] = {
+        int(program_id): int(count)
+        for program_id, count in session.execute(
+            select(enrollment.c.crm_program_id, func.count()).group_by(enrollment.c.crm_program_id)
+        ).all()
+    }
+
+    return {
+        program_id: (people.get(program_id, 0), enrolled.get(program_id, 0))
+        for program_id in set(people) | set(enrolled)
+    }
 
 
 def trainer_index(session: Session, filters: MetricFilters | None = None) -> list[dict[str, Any]]:
