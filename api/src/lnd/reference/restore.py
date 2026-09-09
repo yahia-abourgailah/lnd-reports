@@ -45,6 +45,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 log = logging.getLogger(__name__)
 
+#: Where the report goes when `--out` is not given. Resolved from this file's
+#: location, which is right on a developer's machine and wrong inside the
+#: container — `parents[4]` there is `/`, and the process runs as uid 10001
+#: against a repository owned by somebody else. So the default is stdout and
+#: the rehearsal script redirects on the host, where the file belongs to the
+#: person who ran it.
 REPORT = Path(__file__).resolve().parents[4] / "docs" / "restore-rehearsal.md"
 
 APPLICATION_ROLE = "lnd_app_rw"
@@ -255,6 +261,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--seconds", type=float, default=float(os.environ.get("RESTORE_SECONDS", 0))
     )
+    parser.add_argument(
+        "--out",
+        default="-",
+        help="where to write the report; '-' is stdout, which is the default "
+        "because the container cannot write into the repository",
+    )
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -298,22 +310,29 @@ def main(argv: list[str] | None = None) -> int:
             findings.append(f"{title}: {source_figure} in the source, {restored_figure} restored.")
 
     seconds = args.seconds or (time.perf_counter() - started)
-    REPORT.parent.mkdir(parents=True, exist_ok=True)
-    REPORT.write_text(
-        render(
-            dump=args.dump,
-            target=args.target,
-            source_census=source_census,
-            restored_census=restored_census,
-            source_figures=source_figures,
-            restored_figures=restored_figures,
-            grants=grants,
-            seconds=seconds,
-            findings=findings,
-        ),
-        encoding="utf-8",
+    report = render(
+        dump=args.dump,
+        target=args.target,
+        source_census=source_census,
+        restored_census=restored_census,
+        source_figures=source_figures,
+        restored_figures=restored_figures,
+        grants=grants,
+        seconds=seconds,
+        findings=findings,
     )
-    log.info("wrote %s", REPORT)
+
+    # Stdout by default. Writing the file from inside the container needed a
+    # bind mount and still failed: the process is uid 10001 and the repository
+    # is not. Everything below the report goes to the log, so a redirect
+    # captures the document and nothing else.
+    if args.out == "-":
+        print(report)
+    else:
+        destination = Path(args.out)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(report, encoding="utf-8")
+        log.info("wrote %s", destination)
 
     for finding in findings:
         log.error("FINDING %s", finding)

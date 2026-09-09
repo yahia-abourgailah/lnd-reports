@@ -237,3 +237,12 @@ certs/
 web/test-results/
 web/playwright-report/
 web/a11y-results.json
+
+# Exports downloaded from the dashboard while testing. Four of these reached
+# the repository root in the week-10 branch, browser "(1)" duplicates included.
+# Every one of them is reproducible from /v1/exports in a second.
+/lnd-*.xlsx
+/lnd-*.csv
+/lnd-*.pdf
+/total_*.csv
+/backups/

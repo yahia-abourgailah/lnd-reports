@@ -26,6 +26,10 @@ set -euo pipefail
 
 COMPOSE=${COMPOSE:-"-f compose.yaml -f compose.dev.yaml"}
 TARGET=${TARGET:-lnd_restore}
+# Written here rather than by the container: the verifier runs as uid 10001
+# against a repository owned by somebody else, so it prints the report and this
+# redirects it, leaving a file owned by whoever ran the rehearsal.
+REPORT=${REPORT:-docs/restore-rehearsal.md}
 export COMPOSE
 
 env_value() { grep -E "^$1=" .env | head -1 | cut -d= -f2-; }
@@ -54,4 +58,5 @@ docker compose $COMPOSE exec -T \
   -e RESTORE_DUMP="$(basename "$DUMP")" \
   -e RESTORE_TARGET="$TARGET" \
   -e RESTORE_SECONDS="$(( $(date +%s) - started ))" \
-  api python -m lnd.reference.restore
+  api python -m lnd.reference.restore > "$REPORT"
+echo "✓ wrote $REPORT"
