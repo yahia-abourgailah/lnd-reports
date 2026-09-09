@@ -35,7 +35,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { dismissException, getCompleteness, getExceptions } from '../api'
+import { dismissException, getCompleteness, getDqRules, getExceptions } from '../api'
 import type { DqException, DqRuleInfo } from '../api'
 
 /** Where to go to author the fix. The overlay kinds are the enrichment
@@ -171,6 +171,58 @@ function Trend({ months }: { months: { period: string; excluded: number; flagged
   )
 }
 
+/**
+ * Every rule, whether or not it is firing.
+ *
+ * The queue above shows the rules that are currently open — today one of
+ * eleven. That is the wrong answer to "what does this platform check for?",
+ * which is the question somebody asks before they trust a figure, and the one
+ * that matters most in a walkthrough where eleven published numbers changed.
+ *
+ * So all eleven are listed, with the ones currently firing marked. A rule that
+ * has never fired is not absent from the platform; it is a check that has been
+ * passing.
+ */
+function Checks({ open }: { open: Set<string> }) {
+  const rules = useQuery({ queryKey: ['dq-rules'], queryFn: getDqRules })
+  if (!rules.data) return null
+
+  const losses = rules.data.filter((rule) => rule.costs_numbers)
+  const notices = rules.data.filter((rule) => !rule.costs_numbers)
+
+  return (
+    <section className="group">
+      <div className="group-head">
+        <h2>What the platform checks</h2>
+        <p className="muted">
+          {rules.data.length} rules, run after every rebuild. {open.size} firing now — the rest
+          are checks that are passing, not checks that are missing.
+        </p>
+      </div>
+
+      {[
+        { title: 'These cost figures', rules: losses },
+        { title: 'These flag a record and still count it', rules: notices },
+      ].map((band) => (
+        <div className="checks-band" key={band.title}>
+          <h3>{band.title}</h3>
+          <ul className="checks-list">
+            {band.rules.map((rule) => (
+              <li key={rule.rule} className={open.has(rule.rule) ? 'checking open' : 'checking'}>
+                <span className="checking-state">{open.has(rule.rule) ? 'open' : 'clear'}</span>
+                <div>
+                  <p className="checking-title">{rule.title}</p>
+                  <p className="checking-means">{rule.means}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 export function Exceptions() {
   const queue = useQuery({ queryKey: ['exceptions'], queryFn: () => getExceptions() })
   const trend = useQuery({ queryKey: ['completeness'], queryFn: () => getCompleteness() })
@@ -264,6 +316,8 @@ export function Exceptions() {
       ))}
 
       {trend.data && <Trend months={trend.data.months} />}
+
+      <Checks open={new Set(groups.map((group) => group.rule.rule))} />
     </>
   )
 }

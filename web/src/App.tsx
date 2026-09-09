@@ -13,7 +13,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom'
 
-import { getAuthStatus, getKpis, getMe, logout, Unauthorized } from './api'
+import { getAuthStatus, getExceptionSummary, getKpis, getMe, logout, Unauthorized } from './api'
 import { Coverage } from './components/Coverage'
 import { FilterBar } from './components/FilterBar'
 import { FreshnessBadge } from './components/FreshnessBadge'
@@ -61,6 +61,12 @@ function Dashboard() {
   const path = useLocation().pathname
   const analytical = path !== '/enrichment' && path !== '/reports' && path !== '/exceptions'
   const me = useQuery({ queryKey: ['me'], queryFn: getMe })
+  // How many records the platform could not place, in the chrome. The console
+  // says it in full; this is so nobody has to go and look to find out whether
+  // there is anything to look at. Only losses get the mark — a flagged record
+  // is in the figures, and badging those would train people to ignore the
+  // badge that means something.
+  const queue = useQuery({ queryKey: ['exception-summary'], queryFn: getExceptionSummary })
 
   // The badge reads the envelope of the request the page already made, rather
   // than calling /v1/freshness itself. Two sources for one fact would let the
@@ -89,7 +95,14 @@ function Dashboard() {
             <NavLink to="/trainers">Trainers</NavLink>
             <NavLink to="/learners">Learners</NavLink>
             <NavLink to="/reports">Reports</NavLink>
-            <NavLink to="/exceptions">Exceptions</NavLink>
+            <NavLink to="/exceptions">
+              Exceptions
+              {queue.data && queue.data.excluded > 0 && (
+                <span className="tab-count" title={`${queue.data.excluded} records excluded from figures`}>
+                  {queue.data.excluded}
+                </span>
+              )}
+            </NavLink>
             <NavLink to="/enrichment">Enrichment</NavLink>
           </nav>
 
