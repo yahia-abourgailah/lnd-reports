@@ -224,3 +224,9 @@ web/dist/
 .ruff_cache/
 backups/
 certs/
+
+# LibreOffice/OpenOffice lock files. Created beside a document while it is open
+# and deleted when it closes, so one in the repository is a snapshot of
+# somebody's desktop — `docs/.~lock.L&D Main Reports.xlsx#` was committed that
+# way and removed in week 9.
+.~lock.*#
