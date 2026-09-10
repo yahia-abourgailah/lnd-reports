@@ -79,9 +79,14 @@ export function Kpis({ filters }: { filters: Filters }) {
               formats: ['csv', 'xlsx', 'pdf'],
             },
             {
+              // PDF only. This is the published report, and offering it in two
+              // formats put two files of the same numbers in one mail and two
+              // rows per month on the Reports screen. The figures above are
+              // still available as a spreadsheet, which is the different
+              // request: sorting rows rather than reading a month.
               path: 'monthly',
               label: 'Monthly report',
-              formats: ['xlsx', 'pdf'],
+              formats: ['pdf'],
               note: 'last complete month — ignores the filter bar · kept as an edition',
             },
           ]}

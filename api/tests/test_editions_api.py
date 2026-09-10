@@ -29,11 +29,9 @@ def _sign_in(client: TestClient) -> None:
 
 
 class TestGeneratingTheMonthlyReportKeepsAnEdition:
-    def test_the_workbook_route_records_what_it_returned(
-        self, dev_bypass_client: TestClient
-    ) -> None:
+    def test_the_report_route_records_what_it_returned(self, dev_bypass_client: TestClient) -> None:
         _sign_in(dev_bypass_client)
-        response = dev_bypass_client.get("/v1/exports/monthly.xlsx?year=2026&month=2")
+        response = dev_bypass_client.get("/v1/exports/monthly.pdf?year=2026&month=2")
         assert response.status_code == 200
 
         editions = dev_bypass_client.get("/v1/exports/editions").json()["editions"]
@@ -49,33 +47,36 @@ class TestGeneratingTheMonthlyReportKeepsAnEdition:
     ) -> None:
         _sign_in(dev_bypass_client)
         for _ in range(3):
-            dev_bypass_client.get("/v1/exports/monthly.xlsx?year=2026&month=3")
+            dev_bypass_client.get("/v1/exports/monthly.pdf?year=2026&month=3")
 
         editions = dev_bypass_client.get("/v1/exports/editions").json()["editions"]
         march = [
-            row for row in editions if row["period"] == "2026-03" and row["kind"] == "monthly_xlsx"
+            row for row in editions if row["period"] == "2026-03" and row["kind"] == "monthly_pdf"
         ]
         assert len(march) == 1, "three identical generations should be one edition"
 
-    def test_the_two_formats_share_a_figures_digest(self, dev_bypass_client: TestClient) -> None:
-        """The workbook and the PDF of one month contain the same numbers.
+    def test_the_month_is_published_in_one_format(self, dev_bypass_client: TestClient) -> None:
+        """There was a workbook route beside this one, and publishing both put
+        two files of the same numbers in one mail and two rows per month on the
+        Reports screen, leaving every recipient to decide which was the report.
 
-        Which is what makes the digest readable on the listing: a Workbook row
-        and a PDF row carrying it are one report in two formats, not two
-        different answers.
+        `export.monthly` still builds that grid — the parallel run compares it
+        cell against cell with the sheet this replaces — but building it for a
+        comparison and handing it to somebody as the month are different acts.
         """
         _sign_in(dev_bypass_client)
-        dev_bypass_client.get("/v1/exports/monthly.xlsx?year=2026&month=4")
-        dev_bypass_client.get("/v1/exports/monthly.pdf?year=2026&month=4")
+        assert (
+            dev_bypass_client.get("/v1/exports/monthly.xlsx?year=2026&month=4").status_code == 404
+        )
 
+        dev_bypass_client.get("/v1/exports/monthly.pdf?year=2026&month=4")
         editions = dev_bypass_client.get("/v1/exports/editions").json()["editions"]
-        april = {row["kind"]: row for row in editions if row["period"] == "2026-04"}
-        assert set(april) == {"monthly_xlsx", "monthly_pdf"}
-        assert april["monthly_xlsx"]["figures_sha256"] == april["monthly_pdf"]["figures_sha256"]
+        april = {row["kind"] for row in editions if row["period"] == "2026-04"}
+        assert april == {"monthly_pdf"}
 
     def test_the_listing_never_carries_a_file(self, dev_bypass_client: TestClient) -> None:
         _sign_in(dev_bypass_client)
-        dev_bypass_client.get("/v1/exports/monthly.xlsx?year=2026&month=5")
+        dev_bypass_client.get("/v1/exports/monthly.pdf?year=2026&month=5")
         body = dev_bypass_client.get("/v1/exports/editions").json()
         assert body["editions"]
         assert all("content" not in row for row in body["editions"])
@@ -86,7 +87,7 @@ class TestGeneratingTheMonthlyReportKeepsAnEdition:
 
     def test_year_and_month_go_together(self, dev_bypass_client: TestClient) -> None:
         _sign_in(dev_bypass_client)
-        assert dev_bypass_client.get("/v1/exports/monthly.xlsx?year=2026").status_code == 422
+        assert dev_bypass_client.get("/v1/exports/monthly.pdf?year=2026").status_code == 422
 
     def test_signing_in_is_required(self, client: TestClient) -> None:
         assert client.get("/v1/exports/editions").status_code == 401

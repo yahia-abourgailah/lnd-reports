@@ -190,14 +190,14 @@ class TestTheJob:
         """
         result = report.run(loaded, year=YEAR, month=MONTH, settings=_settings())
         assert result.sent is False
-        assert result.editions_kept == 2, "the workbook and the PDF are both kept"
+        assert result.editions_kept == 1, "the report is kept, as the one PDF it is"
 
         kept = loaded.scalars(
             select(ExportEdition).where(
                 ExportEdition.period_year == YEAR, ExportEdition.period_month == MONTH
             )
         ).all()
-        assert len(kept) == 2
+        assert len(kept) == 1
         assert all(edition.delivery_error for edition in kept)
         assert all(edition.delivered_at is None for edition in kept)
 
@@ -283,10 +283,11 @@ class TestResending:
             part.get_filename(): part.get_payload(decode=True)
             for part in message.iter_attachments()
         }
-        assert (
-            sent[f"lnd-monthly-report-{YEAR}-{MONTH:02d}.xlsx"] == stored[ExportKind.MONTHLY_XLSX]
-        )
         assert sent[f"lnd-monthly-report-{YEAR}-{MONTH:02d}.pdf"] == stored[ExportKind.MONTHLY_PDF]
+        assert list(sent) == [f"lnd-monthly-report-{YEAR}-{MONTH:02d}.pdf"], (
+            "one report, one attachment — a second file of the same numbers "
+            "leaves the recipient to decide which of the two is the report"
+        )
 
     def test_a_period_with_no_edition_says_so(self, loaded: Session) -> None:
         with pytest.raises(report.NothingToResend):

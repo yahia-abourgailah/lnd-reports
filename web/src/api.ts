@@ -473,10 +473,11 @@ export const exportUrl = (path: string, query: string) => `${API_BASE}/exports/$
  * The listing never carries the file. `figures_sha256` digests the numbers the
  * edition contains, never its bytes: every export writes its own generation
  * time into itself, so two renderings of an unchanged month would never match
- * byte for byte. Equal digests mean the figures did not move — across formats
- * too, since the workbook and the PDF of one month share it. */
+ * byte for byte. Equal digests mean the figures did not move. */
 export interface Edition {
   id: number
+  /** `monthly_xlsx` appears only on editions kept before the report became a
+   *  PDF. Nothing publishes that format any more. */
   kind: 'monthly_xlsx' | 'monthly_pdf'
   trigger: 'manual' | 'scheduled'
   /** `YYYY-MM`: the month covered, not the month generated. */

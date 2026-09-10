@@ -174,9 +174,6 @@ class Settings(BaseSettings):
     #: report goes to a group, and a distribution list nobody can enumerate is
     #: a delivery nobody can audit.
     report_recipients: str = ""
-    #: Attach the PDF alongside the workbook. Both are kept as editions either
-    #: way; this only decides what leaves in the mail.
-    report_attach_pdf: bool = True
 
     # -- development-only auth shortcut -------------------------------------
     auth_dev_bypass: bool = False

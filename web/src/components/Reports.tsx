@@ -16,10 +16,21 @@
  * It is a digest of the figures, not of the file. Every export writes its own
  * generation time into itself, so hashing the bytes would report two renderings
  * of an unchanged month as different every time and answer nothing. Equal
- * digests here mean the numbers did not move — and because the workbook and the
- * PDF of one month share it, a Workbook row and a PDF row with the same digest
- * are the same report in two formats. A regeneration that matches the newest
- * edition is not stored at all, so every row on this screen is a real change.
+ * digests here mean the numbers did not move. A regeneration that matches the
+ * newest edition is not stored at all, so every row on this screen is a real
+ * change.
+ *
+ * ONE FORMAT, SO NO FORMAT COLUMN
+ *
+ * The month used to be published twice, as a workbook and as a PDF of the same
+ * numbers, which put two rows here per month and left the reader to work out
+ * which of them was the report. It is a PDF now, so the column that named the
+ * format has nothing left to say.
+ *
+ * Editions from before that change are not listed. They are still stored and
+ * still downloadable by id — nothing is deleted to make a screen tidier — but
+ * a format this application no longer publishes does not belong in a list of
+ * what it published.
  *
  * WHAT IS NOT HERE
  *
@@ -32,10 +43,7 @@ import { useQuery } from '@tanstack/react-query'
 
 import { exportUrl, getEditions } from '../api'
 
-const KIND_LABEL: Record<string, string> = {
-  monthly_xlsx: 'Workbook',
-  monthly_pdf: 'PDF',
-}
+const PUBLISHED = 'monthly_pdf'
 
 function size(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -60,7 +68,12 @@ export function Reports() {
   if (editions.isError) return <p className="warn">The editions could not be listed.</p>
   if (!editions.data) return null
 
-  const { editions: rows, total_editions, total_bytes, retained_per_period } = editions.data
+  const { editions: all, retained_per_period } = editions.data
+  const rows = all.filter((row) => row.kind === PUBLISHED)
+  // Summed over what is listed, not taken from the response. The server counts
+  // every stored edition, and a size that includes rows this table does not
+  // show is a total nobody can reconcile against what is in front of them.
+  const bytes = rows.reduce((sum, row) => sum + row.byte_size, 0)
 
   // Grouped by the month covered, not the month generated. Two rows for August
   // are two editions of August, and putting them under one heading is what
@@ -76,7 +89,7 @@ export function Reports() {
           better number and is never the file that was sent.
         </p>
         <span className="muted">
-          {total_editions} kept · {size(total_bytes)} · newest {retained_per_period} per month
+          {rows.length} kept · {size(bytes)} · newest {retained_per_period} per month
         </span>
       </div>
 
@@ -96,7 +109,6 @@ export function Reports() {
           <table className="table">
             <thead>
               <tr>
-                <th scope="col">Format</th>
                 <th scope="col">Generated</th>
                 <th scope="col">By</th>
                 <th scope="col">Scope</th>
@@ -114,7 +126,6 @@ export function Reports() {
                 .filter((row) => row.period === period)
                 .map((row) => (
                   <tr key={row.id}>
-                    <td>{KIND_LABEL[row.kind] ?? row.kind}</td>
                     <td>{when(row.generated_at)}</td>
                     <td>
                       {/* Null means the schedule made it. Naming a service

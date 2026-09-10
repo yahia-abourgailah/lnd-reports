@@ -2,9 +2,17 @@
 
 Eight to twelve hours per cycle, replaced by a beat entry. The job is short
 because everything it needs already exists — the registry computes the figures,
-`export.monthly` lays out the workbook, `export.pdf` renders the pack,
-`export.retention` keeps what was produced — and this only puts them in the
-right order.
+`export.pdf` renders the pack, `export.retention` keeps what was produced — and
+this only puts them in the right order.
+
+ONE FORMAT
+
+The report is published as a PDF and nothing else. It went out as a workbook
+too, which meant two files of the same numbers in one mail and two rows per
+month on the reports screen, and asked every recipient to decide which of the
+two was the report. `export.monthly` still builds the workbook, because the
+parallel run compares cell against cell with the sheet this replaces — but that
+is a reconciliation, not a publication.
 
 THE ORDER IS THE DESIGN
 
@@ -59,7 +67,6 @@ from lnd.quality import completeness as quality
 
 log = logging.getLogger(__name__)
 
-XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 PDF_TYPE = "application/pdf"
 
 #: The four figures the mail body quotes, in reading order. Every one is on the
@@ -112,12 +119,7 @@ def _body(session: Session, year: int, month: int, period: MetricFilters) -> str
     lines = [
         f"The L&D report for {label}, generated automatically.",
         "",
-        "Attached:",
-        "  · the workbook, in the layout the dashboard tab has always used",
-    ]
-    if get_settings().report_attach_pdf:
-        lines.append("  · the same figures as a PDF, for forwarding and printing")
-    lines += [
+        "Attached: the report as a PDF, in the layout the dashboard tab has always used.",
         "",
         "Headline figures for the period:",
     ]
@@ -206,50 +208,29 @@ def run(
     period = _window(year, month)
     label = f"{year:04d}-{month:02d}"
 
+    # `workbook.headline` is the figures, not the file. The digest is taken
+    # from them so it means "the numbers moved" rather than "the bytes differ",
+    # and it stays the right source now that no workbook is published.
     digest = retention.figures_digest(workbook.headline(session, period).values())
-    previous = retention.latest_for(session, kind=ExportKind.MONTHLY_XLSX, year=year, month=month)
+    previous = retention.latest_for(session, kind=ExportKind.MONTHLY_PDF, year=year, month=month)
     already_delivered = previous is not None and previous.was_delivered
 
-    attachments: list[mailer.Attachment] = []
-    kept = 0
-    moved = False
-
-    xlsx = workbook.monthly_report(session, period)
+    printed = pdf.monthly_pack(session, year, month, period)
     edition, is_new = _keep(
         session,
-        kind=ExportKind.MONTHLY_XLSX,
+        kind=ExportKind.MONTHLY_PDF,
         year=year,
         month=month,
         period=period,
-        content=xlsx,
-        media_type=XLSX_TYPE,
-        extension="xlsx",
+        content=printed,
+        media_type=PDF_TYPE,
+        extension="pdf",
         digest=digest,
     )
-    kept += int(is_new)
-    moved = moved or is_new
-    attachments.append(mailer.Attachment(edition.filename, XLSX_TYPE, xlsx))
+    attachments = [mailer.Attachment(edition.filename, PDF_TYPE, printed)]
     editions = [edition]
 
-    if settings.report_attach_pdf:
-        printed = pdf.monthly_pack(session, year, month, period)
-        pdf_edition, pdf_is_new = _keep(
-            session,
-            kind=ExportKind.MONTHLY_PDF,
-            year=year,
-            month=month,
-            period=period,
-            content=printed,
-            media_type=PDF_TYPE,
-            extension="pdf",
-            digest=digest,
-        )
-        kept += int(pdf_is_new)
-        moved = moved or pdf_is_new
-        attachments.append(mailer.Attachment(pdf_edition.filename, PDF_TYPE, printed))
-        editions.append(pdf_edition)
-
-    run_result = ReportRun(period=label, editions_kept=kept, figures_moved=moved)
+    run_result = ReportRun(period=label, editions_kept=int(is_new), figures_moved=is_new)
 
     if already_delivered and not force_send:
         # The numbers have not moved and the recipients already have this one.

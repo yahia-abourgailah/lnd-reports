@@ -207,30 +207,6 @@ def _publish(
     )
 
 
-@router.get("/monthly.xlsx")
-def monthly(
-    user: CurrentUser,
-    session: DbSession,
-    filters: FilterParams,
-    year: Annotated[int | None, Query(ge=2020, le=2100)] = None,
-    month: Annotated[int | None, Query(ge=1, le=12)] = None,
-) -> Response:
-    """The formatted monthly report, in the workbook's DASHBOARD layout."""
-    year, month = _period(year, month)
-    period_filters = _month_filters(filters, year, month)
-    return _publish(
-        session,
-        kind=ExportKind.MONTHLY_XLSX,
-        year=year,
-        month=month,
-        filters=period_filters,
-        content=monthly_report.monthly_report(session, period_filters),
-        media_type=XLSX_TYPE,
-        extension="xlsx",
-        user_email=user.email,
-    )
-
-
 @router.get("/monthly.pdf")
 def monthly_pdf(
     user: CurrentUser,
@@ -239,11 +215,18 @@ def monthly_pdf(
     year: Annotated[int | None, Query(ge=2020, le=2100)] = None,
     month: Annotated[int | None, Query(ge=1, le=12)] = None,
 ) -> Response:
-    """The same month, as the PDF that gets forwarded rather than opened.
+    """The monthly report. The one format it is published in.
 
-    The XLSX reproduces the workbook's grid because recipients expect their
-    sheet. This one reads top to bottom, with the reconciliation note where it
-    cannot be scrolled past.
+    It reads top to bottom, with the reconciliation note where it cannot be
+    scrolled past. There was an XLSX beside it reproducing the workbook's grid,
+    and publishing both put two files of the same numbers in one mail and two
+    rows per month on the reports screen. `export.monthly` still builds that
+    grid for the parallel run to compare against the sheet this replaces, which
+    is a reconciliation rather than a publication.
+
+    Ad-hoc XLSX is untouched. "Give me these figures as a spreadsheet" is a
+    different request from "publish the month", and the first is what a person
+    sorting rows actually wants.
     """
     year, month = _period(year, month)
     period_filters = _month_filters(filters, year, month)
