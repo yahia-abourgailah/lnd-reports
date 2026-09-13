@@ -2,7 +2,7 @@
  * The KPI summary — the platform's front page.
  *
  * Grouped by provenance rather than by subject, and that is the week-4
- * conversation made visible: the figures somebody has to be walked through are
+ * conversation made visible: the figures that need talking through are
  * together at the top, and the ones that did not move are together at the
  * bottom where they need no explanation.
  *
@@ -22,22 +22,28 @@ import { ExportMenu } from './ExportMenu'
 import { KpiCard } from './KpiCard'
 import { Overview } from './Overview'
 
+// The notes are written for the people whose figures these are, because they
+// are the people reading them. An earlier pass wrote them for ourselves — one
+// said the published figure was wrong and told the reader to walk L&D through
+// each one, which is a task from our plan addressed to somebody who is not in
+// our plan. What belongs on screen is what changed and why, said plainly. Each
+// card carries its own definition, so the note only has to name the group.
 const GROUPS: { provenance: Metric['provenance'][]; title: string; note: string }[] = [
   {
     provenance: ['corrected'],
     title: 'Corrected',
-    note: 'The published figure was wrong. Walk L&D through each of these.',
+    note: 'These read differently from before. Open one to see what it counts now.',
   },
   {
     provenance: ['restated', 'renamed'],
     title: 'Restated',
-    note: 'Same intent, a definition that now says exactly what it counts.',
+    note: 'The same measure, with a definition that says exactly what it counts.',
   },
-  { provenance: ['new'], title: 'New', note: 'The workbook did not have these.' },
+  { provenance: ['new'], title: 'New', note: 'Measures that were not reported before.' },
   {
     provenance: ['unchanged'],
     title: 'Unchanged',
-    note: 'Same definition, same number. Nothing to explain.',
+    note: 'Same definition, same number.',
   },
 ]
 

@@ -211,7 +211,7 @@ export function Overview({ filters, metrics }: { filters: Filters; metrics: Metr
       <div className="board board-3">
         <Panel
           title="Delivered by L&D, or not"
-          note="Counted on completed programmes. The workbook drew its own total as a third slice of this."
+          note="Counted on completed programmes."
         >
           {delivered && delivered.numerator !== null && delivered.denominator !== null ? (
             <Donut
