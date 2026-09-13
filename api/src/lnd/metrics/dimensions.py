@@ -60,13 +60,37 @@ _EMPLOYEE_ATTRIBUTES: dict[Dimension, tuple[str, str]] = {
 
 _PROGRAM_ATTRIBUTES: dict[Dimension, tuple[str, str]] = {
     Dimension.PROGRAM_TYPE: ("type", "Delivered by"),
-    Dimension.PROGRAM_TARGET: ("target", "Audience"),
+    Dimension.PROGRAM_TARGET: ("target", "Public or customised"),
+}
+
+#: What each stored value is called on screen.
+#:
+#: `core` keeps the CRM's own word and the board has always used the business
+#: one, so the bar offered "department" for the slice the board labels
+#: "Customised" and "internal" for the one it calls "By L&D". Three vocabularies
+#: for two facts, and the filter for a figure on screen could not be found by
+#: the name the figure was given.
+#:
+#: Labels only. The value sent back is the stored one, so a saved view keeps
+#: working when a label is reworded, and a value the CRM adds later is offered
+#: under its own name rather than disappearing for want of a translation.
+_PROGRAM_VALUE_LABELS: dict[Dimension, dict[str, str]] = {
+    Dimension.PROGRAM_TYPE: {"internal": "By L&D", "external": "By someone else"},
+    Dimension.PROGRAM_TARGET: {"public": "Public calendar", "department": "Customised"},
 }
 
 
-def _values(session: Session, statement: Select[tuple[str, int]]) -> tuple[DimensionValue, ...]:
+def _values(
+    session: Session,
+    statement: Select[tuple[str, int]],
+    labels: dict[str, str] | None = None,
+) -> tuple[DimensionValue, ...]:
     return tuple(
-        DimensionValue(value=str(value), label=str(value), count=int(count))
+        DimensionValue(
+            value=str(value),
+            label=(labels or {}).get(str(value), str(value)),
+            count=int(count),
+        )
         for value, count in session.execute(statement).all()
         if value is not None
     )
@@ -96,7 +120,10 @@ def _program_options(session: Session, dimension: Dimension) -> DimensionOptions
         .order_by(func.count().desc(), column)
     )
     return DimensionOptions(
-        dimension=dimension, label=label, counts="programs", values=_values(session, statement)
+        dimension=dimension,
+        label=label,
+        counts="programs",
+        values=_values(session, statement, _PROGRAM_VALUE_LABELS.get(dimension)),
     )
 
 

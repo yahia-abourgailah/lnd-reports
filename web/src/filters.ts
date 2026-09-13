@@ -17,7 +17,7 @@
  *   without any screen having to hand them over.
  */
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 /** The filter parameters, named exactly as the API reads them. */
@@ -36,6 +36,33 @@ export type FilterKey = (typeof FILTER_KEYS)[number]
 
 /** Parameters that are not filters and must survive filter changes. */
 const RESERVED = new Set(['by'])
+
+function isoDate(day: Date): string {
+  // Built from the local parts, never `toISOString`. That is UTC, and east of
+  // Greenwich it returns yesterday for most of the evening — a dashboard that
+  // opens on the wrong day after 9pm and is right again in the morning.
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`
+}
+
+/** The window a view opens on when the URL names none: this year, to today.
+ *
+ * WHY THERE IS A DEFAULT AT ALL
+ *
+ * Opening on everything meant opening on July 2025 to September 2026 — fifteen
+ * months, seven of which nobody was asking about. "How are we doing" means this
+ * year unless somebody says otherwise, and a reader who has to narrow the bar
+ * before the first number means anything will read the first number anyway.
+ *
+ * WHY IT ENDS TODAY AND NOT AT NEW YEAR
+ *
+ * Four sessions are already scheduled ahead, and 31 December would count them
+ * as delivered and measure recency from a date three months away. This year so
+ * far is a window where everything in it has happened.
+ */
+export function defaultWindow(now: Date = new Date()): { from: string; to: string } {
+  return { from: `${now.getFullYear()}-01-01`, to: isoDate(now) }
+}
 
 export interface Filters {
   /** The query string to append to an API path, `?…` or empty. */
@@ -65,6 +92,25 @@ export function useFilters(): Filters {
 
   const dateFrom = params.get('date_from')
   const dateTo = params.get('date_to')
+
+  // Written into the URL rather than applied behind it. A view is a link here,
+  // and a link that carries no dates would mean this year whenever it happened
+  // to be opened — the same address answering a different question in January.
+  // Replace, not push, so the first press of back leaves the page rather than
+  // returning to a URL that redirects again.
+  useEffect(() => {
+    if (dateFrom !== null || dateTo !== null) return
+    const { from, to } = defaultWindow()
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous)
+        next.set('date_from', from)
+        next.set('date_to', to)
+        return next
+      },
+      { replace: true },
+    )
+  }, [dateFrom, dateTo, setParams])
 
   const query = useMemo(() => {
     // Rebuilt from the known keys rather than passed through wholesale, so a
@@ -115,6 +161,11 @@ export function useFilters(): Filters {
   const clear = useCallback(() => {
     setParams((previous) => {
       const next = new URLSearchParams()
+      // Dates included, which the effect above then restores to the default.
+      // Clearing returns the page to how it opens; it does not widen it to
+      // fifteen months of history nobody asked for. To see further back, empty
+      // the From field — the effect only fires when both dates are absent.
+      //
       // A view's own parameters are not filters. Clearing the bar on a
       // breakdown must not also forget which dimension is being broken down.
       for (const key of RESERVED) {
@@ -125,8 +176,16 @@ export function useFilters(): Filters {
     })
   }, [setParams])
 
+  // The default window is not something to clear. Counting it would put a
+  // "Clear 1" on a bar nobody has touched, which teaches the reader that the
+  // count means nothing.
+  const isDefaultWindow = useMemo(() => {
+    const { from, to } = defaultWindow()
+    return dateFrom === from && dateTo === to
+  }, [dateFrom, dateTo])
+
   const activeCount =
-    Object.keys(selected).length + (dateFrom || dateTo ? 1 : 0)
+    Object.keys(selected).length + (!isDefaultWindow && (dateFrom || dateTo) ? 1 : 0)
 
   return { query, selected, dateFrom, dateTo, activeCount, toggle, setDates, clear }
 }

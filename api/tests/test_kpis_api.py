@@ -279,6 +279,29 @@ class TestDimensions:
         assert program_values[0]["value"] == "93"
         assert program_values[0]["label"] == "The Adaptive Leader"
 
+    def test_a_filter_is_named_the_way_the_board_names_it(self, dashboard: TestClient) -> None:
+        """The board shows a Public calendar and Customised split, and the bar
+        offered "public" and "department" for the same two things under a menu
+        called Audience. Three vocabularies for two facts, and the filter for a
+        figure on screen could not be found by the name the figure was given.
+        """
+        options = {d["dimension"]: d for d in body(dashboard, "/v1/kpis/dimensions")["dimensions"]}
+        audience = options["program_target"]
+
+        assert audience["label"] == "Public or customised"
+        assert {v["label"] for v in audience["values"]} <= {"Public calendar", "Customised"}
+
+    def test_the_stored_value_is_what_the_filter_sends(self, dashboard: TestClient) -> None:
+        """Labels are for reading. A bar that sent its own wording would break
+        every saved view the first time somebody reworded one, and would need a
+        translation kept in step with the CRM to filter at all."""
+        options = {d["dimension"]: d for d in body(dashboard, "/v1/kpis/dimensions")["dimensions"]}
+        by_label = {v["label"]: v["value"] for v in options["program_target"]["values"]}
+
+        assert by_label["Public calendar"] == "public"
+        narrowed = body(dashboard, "/v1/kpis?program_target=public")
+        assert "program_target" in narrowed["dimensions_filtered"]
+
     def test_period_is_not_offered_as_a_list(self, dashboard: TestClient) -> None:
         """A date range is not a list of values to pick from, and every month
         as a checkbox is a worse date picker than a date picker."""
